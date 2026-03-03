@@ -13,6 +13,8 @@ export default function Home() {
   const [transcript, setTranscript] = useState("");
   const [grid1, setGrid1] = useState({ x: 2, y: 2 }); // Brevity/Seriousness
   const [grid2, setGrid2] = useState({ x: 2, y: 2 }); // Stance/Understanding
+  const [grid3, setGrid3] = useState({ x: 2, y: 2 }); // Time/Urgency
+  const [isQuestion, setIsQuestion] = useState(false); // Question/Statement
   const [responses, setResponses] = useState<ResponseItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isManualMode, setIsManualMode] = useState(false); // Feature requested in PRD
@@ -25,7 +27,7 @@ export default function Home() {
       }, 800);
       return () => clearTimeout(delayDebounceFn);
     }
-  }, [grid1, grid2, isManualMode]);
+  }, [grid1, grid2, grid3, isQuestion, isManualMode]);
 
   const handleNewTranscription = (text: string) => {
     setTranscript(text);
@@ -44,6 +46,8 @@ export default function Home() {
           transcript: currentTranscript,
           grid1,
           grid2,
+          grid3,
+          isQuestion,
           context: ["Cafe", "Barista"]
         }),
       });
@@ -76,12 +80,24 @@ export default function Home() {
 
         {/* Tier 4: Intent & Sentiment Grids */}
         <div className="shrink-0 pt-4 pb-2 border-y border-slate-800/50">
-          <IntentGrids grid1={grid1} setGrid1={setGrid1} grid2={grid2} setGrid2={setGrid2} />
+          <IntentGrids
+            grid1={grid1} setGrid1={setGrid1}
+            grid2={grid2} setGrid2={setGrid2}
+            grid3={grid3} setGrid3={setGrid3}
+            isQuestion={isQuestion} setIsQuestion={setIsQuestion}
+          />
         </div>
 
         {/* Tier 5: Long-Form Replies (2x2 Grid) */}
         <div className="flex-1 overflow-hidden">
-          <ResponseGrid responses={responses} isLoading={isLoading} />
+          <ResponseGrid
+            responses={responses}
+            isLoading={isLoading}
+            onResponseSelect={() => {
+              setGrid2({ x: 2, y: 2 });
+              setGrid3({ x: 2, y: 2 });
+            }}
+          />
         </div>
 
         {/* Real STT Input Area */}

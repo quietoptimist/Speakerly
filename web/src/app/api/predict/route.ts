@@ -8,7 +8,7 @@ const openai = new OpenAI({
 export async function POST(req: Request) {
     try {
         const body = await req.json();
-        const { transcript, grid1, grid2, context } = body;
+        const { transcript, grid1, grid2, grid3, isQuestion, context } = body;
 
         if (!transcript) {
             return NextResponse.json({ error: "Transcript is required" }, { status: 400 });
@@ -21,12 +21,25 @@ export async function POST(req: Request) {
 
         // grid2: x = stance (0-4), y = understanding (0-4)
         const stanceDescriptions = ["strongly disagreeing or pushing back", "disagreeing lightly or offering an alternative", "neutral or inquiring", "agreeing and supportive", "strongly agreeing and enthusiastic"];
-        const understandingDescriptions = ["completely confused, needs clarification", "unsure or asking questions", "following along neutrally", "understands the point", "completely understands and validates"];
+        const understandingDescriptions = [
+            "completely confused, needs clarification",
+            "somewhat confused, unsure",
+            "neutral, following along",
+            "mostly clear, understands the main points",
+            "completely clear on the topic, understands perfectly"
+        ];
+
+        // grid3: x = time (0-4), y = urgency (0-4)
+        const timeDescriptions = ["referring to the distant past", "referring to the recent past", "referring to the present moment", "referring to the near future", "referring to the distant future"];
+        const urgencyDescriptions = ["completely relaxed, no rush", "casual, whenever", "normal importance", "important, somewhat urgent", "extremely urgent, emergency"];
 
         const brevityDesc = brevityDescriptions[grid1?.x ?? 2];
         const toneDesc = seriousnessDescriptions[grid1?.y ?? 2];
         const stanceDesc = stanceDescriptions[grid2?.x ?? 2];
         const understandingDesc = understandingDescriptions[grid2?.y ?? 2];
+        const timeDesc = timeDescriptions[grid3?.x ?? 2];
+        const urgencyDesc = urgencyDescriptions[grid3?.y ?? 2];
+        const sentenceTypeDesc = isQuestion ? "ASK A QUESTION" : "MAKE A STATEMENT";
 
         const contextContext = context && context.length > 0 ? `Current Context: ${context.join(", ")}` : "No specific context.";
 
@@ -38,10 +51,13 @@ Listen to the partner's transcript, and look at the User's current Intention set
 Partner says: "${transcript}"
 
 User's Intentions:
+- Sentence Type: ${sentenceTypeDesc}
 - Attitude/Tone: ${toneDesc}
 - Length/Brevity: ${brevityDesc}
 - Understanding of partner: ${understandingDesc}
 - Stance/Agreement: ${stanceDesc}
+- Time Reference: ${timeDesc}
+- Urgency: ${urgencyDesc}
 - ${contextContext}
 
 CRITICAL RULES:

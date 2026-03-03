@@ -12,9 +12,10 @@ export interface ResponseItem {
 interface ResponseGridProps {
     responses: ResponseItem[];
     isLoading: boolean;
+    onResponseSelect?: () => void;
 }
 
-export function ResponseGrid({ responses, isLoading }: ResponseGridProps) {
+export function ResponseGrid({ responses, isLoading, onResponseSelect }: ResponseGridProps) {
     const [playingId, setPlayingId] = useState<string | number | null>(null);
     const [isSynthesizing, setIsSynthesizing] = useState<string | number | null>(null);
     const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -28,6 +29,10 @@ export function ResponseGrid({ responses, isLoading }: ResponseGridProps) {
 
         const resId = res.id ?? res.title;
         setIsSynthesizing(resId);
+
+        if (onResponseSelect) {
+            onResponseSelect();
+        }
 
         try {
             const response = await fetch("/api/speak", {
