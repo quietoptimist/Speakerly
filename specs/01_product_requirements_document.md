@@ -22,12 +22,16 @@
 *   **Smart Predictions:** An LLM predicts 3–5 full-sentence responses based on the transcript, recent history, and context.
 *   **One-Tap TTS:** The user taps a prediction, and the browser speaks it aloud immediately.
 
-### B. Context & Personality Engine
+### B. Initiative Mode & Smart Inputs
+*   **Conversation Starters:** When no one is speaking, the app displays context-aware conversation starters to allow the user to initiate interactions (e.g., "Good morning," "I'm here for my appointment").
+*   **Smart Contextual Inputs:** When the incoming transcript asks for specific data (numbers, dates, names from a known list), the UI dynamically swaps the sentence options for large, native-style input components (e.g., a number dial, a date picker, or a list of favorite restaurants) to avoid manual typing.
+
+### C. Context & Personality Engine
 *   **"Who am I talking to?" Selector:** Quick toggle to set the conversation partner (e.g., Doctor, Wife, Stranger, Barista) to adjust the LLM's tone.
 *   **Location/Mode Selector:** Quick toggle for context (e.g., Home, Hospital, Cafe, Urgent).
 *   **Personality Slider:** Ability to adjust tone on the fly (e.g., Serious <--> Sarcastic/Funny).
 
-### C. The "Escape Hatch" (Manual Entry)
+### D. The "Escape Hatch" (Manual Entry)
 *   **Quick Type:** A sleek keyboard interface for when the AI guesses wrong.
 *   **Live Completion:** As the user types, the AI instantly attempts to finish the sentence (like Google Smart Compose, but for speech).
 
