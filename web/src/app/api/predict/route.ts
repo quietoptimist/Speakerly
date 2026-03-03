@@ -8,11 +8,13 @@ const openai = new OpenAI({
 export async function POST(req: Request) {
     try {
         const body = await req.json();
-        const { transcript, grid1, grid2, grid3, isQuestion, context } = body;
+        const { transcript, chatHistory = [], grid1, grid2, grid3, isQuestion, context } = body;
 
-        if (!transcript) {
-            return NextResponse.json({ error: "Transcript is required" }, { status: 400 });
+        if (typeof transcript !== "string") {
+            return NextResponse.json({ error: "Transcript must be a string" }, { status: 400 });
         }
+
+        const isInitiativeMode = transcript.trim() === "";
 
         // Map grid coordinates to prompt descriptions
         // grid1: x = brevity (0-4), y = seriousness (0-4)
@@ -43,15 +45,29 @@ export async function POST(req: Request) {
 
         const contextContext = context && context.length > 0 ? `Current Context: ${context.join(", ")}` : "No specific context.";
 
-        const systemPrompt = `You are the predictive "Brain" of an AAC (Augmentative and Alternative Communication) app.
+        // Format Conversation History
+        let historyPrompt = "";
+        if (chatHistory && chatHistory.length > 0) {
+            historyPrompt = `\nConversation History:\n${chatHistory.map((m: any) => `${m.role === 'user' ? 'User' : 'Partner'}: ${m.text}`).join('\n')}\n`;
+        }
+
+        const systemPrompt = isInitiativeMode
+            ? `You are the predictive "Brain" of an AAC (Augmentative and Alternative Communication) app.
+Your user cannot speak. You must generate 4 perfect, full-sentence options for them to START or CONTINUE a conversation based on their current context and intentions.
+${historyPrompt}
+User's Environment & Intentions:
+- Sentence Type: ${sentenceTypeDesc}`
+            : `You are the predictive "Brain" of an AAC (Augmentative and Alternative Communication) app.
 Your user cannot speak. You must generate 4 perfect, full-sentence options for them to say in reply to their conversation partner.
 
-Listen to the partner's transcript, and look at the User's current Intention settings.
-
-Partner says: "${transcript}"
+Listen to the partner's latest transcript and any history, and look at the User's current Intention settings.
+${historyPrompt}
+Partner's latest utterance: "${transcript}"
 
 User's Intentions:
-- Sentence Type: ${sentenceTypeDesc}
+- Sentence Type: ${sentenceTypeDesc}`;
+
+        const fullPrompt = `${systemPrompt}
 - Attitude/Tone: ${toneDesc}
 - Length/Brevity: ${brevityDesc}
 - Understanding of partner: ${understandingDesc}
@@ -62,7 +78,7 @@ User's Intentions:
 
 CRITICAL RULES:
 1. Generate exactly 4 distinct options.
-2. The options MUST perfectly align with the User's Intentions (Tone and Stance). If the stance is "disagreeing", provide 4 polite but firm ways to disagree.
+2. The options MUST perfectly align with the User's Intentions (Tone, Stance, Time, etc.). If the stance is "disagreeing", provide 4 polite but firm ways to disagree.
 3. Output MUST be valid JSON matching this exact schema:
 {
   "responses": [
@@ -81,7 +97,7 @@ Ensure the JSON is perfectly formatted.`;
             model: "gpt-4o-mini",
             response_format: { type: "json_object" },
             messages: [
-                { role: "system", content: systemPrompt }
+                { role: "system", content: fullPrompt }
             ],
             temperature: 0.7,
         });

@@ -12,7 +12,7 @@ export interface ResponseItem {
 interface ResponseGridProps {
     responses: ResponseItem[];
     isLoading: boolean;
-    onResponseSelect?: () => void;
+    onResponseSelect?: (response: ResponseItem) => void;
 }
 
 export function ResponseGrid({ responses, isLoading, onResponseSelect }: ResponseGridProps) {
@@ -31,7 +31,7 @@ export function ResponseGrid({ responses, isLoading, onResponseSelect }: Respons
         setIsSynthesizing(resId);
 
         if (onResponseSelect) {
-            onResponseSelect();
+            onResponseSelect(res);
         }
 
         try {

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { TopBar } from "@/components/layout/TopBar";
-import { Transcript } from "@/components/chat/Transcript";
+import { Transcript, ChatMessage } from "@/components/chat/Transcript";
 import { QuickReplies } from "@/components/chat/QuickReplies";
 import { IntentGrids } from "@/components/chat/IntentGrids";
 import { ResponseGrid, ResponseItem } from "@/components/chat/ResponseGrid";
@@ -11,6 +11,8 @@ import { Input } from "@/components/ui/input";
 
 export default function Home() {
   const [transcript, setTranscript] = useState("");
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+  const [activeContexts, setActiveContexts] = useState<string[]>(["📍 Cafe", "🗣️ Barista"]); // Dynamic contexts
   const [grid1, setGrid1] = useState({ x: 2, y: 2 }); // Brevity/Seriousness
   const [grid2, setGrid2] = useState({ x: 2, y: 2 }); // Stance/Understanding
   const [grid3, setGrid3] = useState({ x: 2, y: 2 }); // Time/Urgency
@@ -19,24 +21,24 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [isManualMode, setIsManualMode] = useState(false); // Feature requested in PRD
 
-  // Auto-regenerate if sliders move AND we have a valid transcript AND not in manual mode
+  // Auto-regenerate if sliders or contexts change, or if we need initial options
   useEffect(() => {
-    if (!isManualMode && transcript.length > 3) {
-      const delayDebounceFn = setTimeout(() => {
-        generatePredictions(transcript);
-      }, 800);
-      return () => clearTimeout(delayDebounceFn);
+    if (!isManualMode) {
+      if (transcript.length === 0 || transcript.length > 3) {
+        const delayDebounceFn = setTimeout(() => {
+          generatePredictions(transcript);
+        }, 800);
+        return () => clearTimeout(delayDebounceFn);
+      }
     }
-  }, [grid1, grid2, grid3, isQuestion, isManualMode]);
+  }, [transcript, grid1, grid2, grid3, isQuestion, isManualMode, activeContexts]);
 
   const handleNewTranscription = (text: string) => {
+    setChatHistory(prev => [...prev, { role: "partner", text }]);
     setTranscript(text);
-    generatePredictions(text);
   };
 
   const generatePredictions = async (currentTranscript: string) => {
-    if (!currentTranscript) return;
-
     setIsLoading(true);
     try {
       const res = await fetch("/api/predict", {
@@ -44,11 +46,12 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           transcript: currentTranscript,
+          chatHistory,
           grid1,
           grid2,
           grid3,
           isQuestion,
-          context: ["Cafe", "Barista"]
+          context: activeContexts
         }),
       });
       const data = await res.json();
@@ -65,12 +68,21 @@ export default function Home() {
   return (
     <main className="flex flex-col h-screen bg-slate-950 text-slate-50 overflow-hidden">
       {/* Tier 1: Top Bar */}
-      <TopBar isManualMode={isManualMode} setIsManualMode={setIsManualMode} />
+      <TopBar
+        isManualMode={isManualMode} setIsManualMode={setIsManualMode}
+        activeContexts={activeContexts} setActiveContexts={setActiveContexts}
+      />
 
       <div className="flex-1 flex flex-col p-4 gap-4 overflow-hidden max-w-4xl mx-auto w-full">
-        {/* Tier 2: Transcript */}
+        {/* Tier 2: Transcript History */}
         <div className="shrink-0 h-[15%] min-h-[100px]">
-          <Transcript text={transcript} />
+          <Transcript
+            messages={chatHistory}
+            onClear={() => {
+              setChatHistory([]);
+              setTranscript("");
+            }}
+          />
         </div>
 
         {/* Tier 3: Quick Backchannels */}
@@ -93,7 +105,9 @@ export default function Home() {
           <ResponseGrid
             responses={responses}
             isLoading={isLoading}
-            onResponseSelect={() => {
+            onResponseSelect={(response) => {
+              setChatHistory(prev => [...prev, { role: "user", text: response.body }]);
+              setTranscript(""); // Resets to Initiative Mode
               setGrid2({ x: 2, y: 2 });
               setGrid3({ x: 2, y: 2 });
             }}
@@ -113,7 +127,9 @@ export default function Home() {
               </button>
             )}
           </div>
-          <AudioRecorder onTranscription={handleNewTranscription} />
+          <AudioRecorder
+            onTranscription={handleNewTranscription}
+          />
 
           {/* Keep debug input for dev testing without breaking microphone */}
           <div className="opacity-30 hover:opacity-100 transition-opacity flex items-center gap-2 mt-4">
