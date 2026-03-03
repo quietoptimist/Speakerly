@@ -30,6 +30,8 @@
 *   **"Who am I talking to?" Selector:** Quick toggle to set the conversation partner (e.g., Doctor, Wife, Stranger, Barista) to adjust the LLM's tone.
 *   **Location/Mode Selector:** Quick toggle for context (e.g., Home, Hospital, Cafe, Urgent).
 *   **Personality Slider:** Ability to adjust tone on the fly (e.g., Serious <--> Sarcastic/Funny).
+*   **Generation Mode Toggle:** A setting allowing users to switch between "Auto-Generate" (predictions update constantly based on mic/sliders) and "Manual-Generate" (predictions only update when the user taps a specific 'Generate' button to save API calls or reduce visual distraction).
+*   **Dynamic Middle Tier (Future):** Space reserved above the final responses for context-sensitive options (e.g., specific concepts or topics to steer the AI before it generates full sentences).
 
 ### D. The "Escape Hatch" (Manual Entry)
 *   **Quick Type:** A sleek keyboard interface for when the AI guesses wrong.
