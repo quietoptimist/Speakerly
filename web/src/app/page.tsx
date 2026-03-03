@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { TopBar } from "@/components/layout/TopBar";
 import { Transcript, ChatMessage } from "@/components/chat/Transcript";
 import { QuickReplies } from "@/components/chat/QuickReplies";
 import { IntentGrids } from "@/components/chat/IntentGrids";
 import { ResponseGrid, ResponseItem } from "@/components/chat/ResponseGrid";
 import { AudioRecorder } from "@/components/chat/AudioRecorder";
+import { WordCloud, SuggestedWord } from "@/components/chat/WordCloud";
 import { Input } from "@/components/ui/input";
 
 export default function Home() {
@@ -18,20 +19,29 @@ export default function Home() {
   const [grid3, setGrid3] = useState({ x: 2, y: 2 }); // Time/Urgency
   const [isQuestion, setIsQuestion] = useState(false); // Question/Statement
   const [responses, setResponses] = useState<ResponseItem[]>([]);
+
+  // Word Cloud States
+  const [suggestedWords, setSuggestedWords] = useState<SuggestedWord[]>([]);
+  const [selectedWords, setSelectedWords] = useState<string[]>([]);
+  const [requestedWordCount, setRequestedWordCount] = useState(20);
+
   const [isLoading, setIsLoading] = useState(false);
   const [isManualMode, setIsManualMode] = useState(false); // Feature requested in PRD
 
-  // Auto-regenerate if sliders or contexts change, or if we need initial options
+  const lastHistoryLength = useRef(0);
+
+  // Auto-regenerate if sliders or contexts change (Auto mode only), or ALWAYS if new conversation turn.
   useEffect(() => {
-    if (!isManualMode) {
-      if (transcript.length === 0 || transcript.length > 3) {
-        const delayDebounceFn = setTimeout(() => {
-          generatePredictions(transcript);
-        }, 800);
-        return () => clearTimeout(delayDebounceFn);
-      }
+    const isNewTurn = chatHistory.length !== lastHistoryLength.current;
+    lastHistoryLength.current = chatHistory.length;
+
+    if (!isManualMode || isNewTurn) {
+      const delayDebounceFn = setTimeout(() => {
+        generatePredictions(transcript);
+      }, 800);
+      return () => clearTimeout(delayDebounceFn);
     }
-  }, [transcript, grid1, grid2, grid3, isQuestion, isManualMode, activeContexts]);
+  }, [transcript, grid1, grid2, grid3, isQuestion, isManualMode, activeContexts, selectedWords, requestedWordCount, chatHistory]);
 
   const handleNewTranscription = (text: string) => {
     setChatHistory(prev => [...prev, { role: "partner", text }]);
@@ -51,12 +61,34 @@ export default function Home() {
           grid2,
           grid3,
           isQuestion,
-          context: activeContexts
+          context: activeContexts,
+          selectedWords,
+          requestedWordCount
         }),
       });
       const data = await res.json();
       if (data.responses) {
         setResponses(data.responses);
+      }
+      if (data.words) {
+        setSuggestedWords((prevSuggested) => {
+          // Ensure previously selected words remain in the list so they can be deselected
+          const previousSelectedObjects = prevSuggested.filter(w => selectedWords.includes(w.word));
+          const allWords = [...previousSelectedObjects, ...(data.words as SuggestedWord[])];
+
+          // Deduplicate words (case-insensitive) to prevent React key errors
+          const uniqueMap = new Map<string, SuggestedWord>();
+          allWords.forEach(w => {
+            if (w && w.word && !uniqueMap.has(w.word.toLowerCase())) {
+              uniqueMap.set(w.word.toLowerCase(), w);
+            }
+          });
+
+          // Sort words by theme to keep them relatively stable visually
+          return Array.from(uniqueMap.values()).sort((a, b) => a.theme.localeCompare(b.theme));
+        });
+      } else {
+        console.warn("API did not return a words array. Payload received:", data);
       }
     } catch (error) {
       console.error("Failed to generate responses", error);
@@ -81,6 +113,7 @@ export default function Home() {
             onClear={() => {
               setChatHistory([]);
               setTranscript("");
+              setSelectedWords([]);
             }}
           />
         </div>
@@ -100,8 +133,34 @@ export default function Home() {
           />
         </div>
 
+        {/* Tier 4.5: Word Cloud */}
+        <div className="shrink-0 h-[20%] min-h-[120px]">
+          <WordCloud
+            words={suggestedWords}
+            selectedWords={selectedWords}
+            requestedCount={requestedWordCount}
+            onCountChange={(delta) => setRequestedWordCount(Math.max(10, Math.min(40, requestedWordCount + delta)))}
+            isLoading={isLoading}
+            onWordToggle={(word) => {
+              setSelectedWords(prev =>
+                prev.includes(word) ? prev.filter(w => w !== word) : [...prev, word]
+              );
+            }}
+          />
+        </div>
+
         {/* Tier 5: Long-Form Replies (2x2 Grid) */}
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 overflow-hidden flex flex-col gap-2">
+          {isManualMode && (
+            <div className="flex justify-end pr-1">
+              <button
+                onClick={() => generatePredictions(transcript)}
+                className="text-sm font-semibold text-cyan-400 hover:text-cyan-300 flex items-center gap-1 bg-cyan-500/10 border border-cyan-500/30 px-4 py-1.5 rounded-full shadow-[0_0_10px_rgba(6,182,212,0.2)] hover:bg-cyan-500/20 hover:scale-105 active:scale-95 transition-all"
+              >
+                Generate Now
+              </button>
+            </div>
+          )}
           <ResponseGrid
             responses={responses}
             isLoading={isLoading}
@@ -110,23 +169,14 @@ export default function Home() {
               setTranscript(""); // Resets to Initiative Mode
               setGrid2({ x: 2, y: 2 });
               setGrid3({ x: 2, y: 2 });
+              setSelectedWords([]);
             }}
           />
         </div>
 
         {/* Real STT Input Area */}
         <div className="shrink-0 pt-2 flex flex-col gap-2">
-          <div className="flex justify-between items-end">
-            <p className="text-xs text-slate-500">Audio Input</p>
-            {isManualMode && (
-              <button
-                onClick={() => generatePredictions(transcript)}
-                className="text-xs text-cyan-400 hover:text-cyan-300 flex items-center gap-1 bg-cyan-500/10 px-2 py-1 rounded"
-              >
-                Generate Now
-              </button>
-            )}
-          </div>
+          <p className="text-xs text-slate-500">Audio Input</p>
           <AudioRecorder
             onTranscription={handleNewTranscription}
           />
