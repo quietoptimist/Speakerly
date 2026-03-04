@@ -1,5 +1,6 @@
-import { Menu, Mic, Zap, Hand, Plus, X } from "lucide-react";
+import { Menu, Zap, Hand, Plus, X, Brain } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { AudioRecorder } from "@/components/chat/AudioRecorder";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -19,11 +20,16 @@ interface TopBarProps {
     setIsManualMode?: (val: boolean) => void;
     activeContexts?: string[];
     setActiveContexts?: (val: string[]) => void;
+    onTranscription?: (text: string) => void;
+    selectedModel?: string;
+    setSelectedModel?: (val: string) => void;
 }
 
 export function TopBar({
     isManualMode = false, setIsManualMode,
-    activeContexts = [], setActiveContexts
+    activeContexts = [], setActiveContexts,
+    onTranscription,
+    selectedModel = "openai", setSelectedModel
 }: TopBarProps) {
 
     const toggleContext = (context: string) => {
@@ -53,16 +59,51 @@ export function TopBar({
                         title={isManualMode ? "Manual Generation Mode" : "Auto Generation Mode"}
                     >
                         {isManualMode ? <Hand className="h-3 w-3" /> : <Zap className="h-3 w-3" />}
-                        <span className="text-xs uppercase tracking-wider">{isManualMode ? "Manual" : "Auto"}</span>
+                        <span className="text-xs uppercase tracking-wider hidden sm:inline">{isManualMode ? "Manual" : "Auto"}</span>
                     </Button>
+                )}
+
+                {/* Model Selector */}
+                {setSelectedModel && (
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="border-slate-700 rounded-full flex gap-2 items-center px-3 bg-slate-800 text-slate-300 hover:text-white"
+                                title="Select AI Provider"
+                            >
+                                <Brain className="h-3 w-3 text-purple-400" />
+                                <span className="text-xs uppercase tracking-wider hidden sm:inline">{selectedModel}</span>
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent className="w-48 bg-slate-900 border-slate-800 text-slate-200" align="start">
+                            <DropdownMenuLabel>AI Provider</DropdownMenuLabel>
+                            <DropdownMenuSeparator className="bg-slate-800" />
+                            <DropdownMenuCheckboxItem
+                                checked={selectedModel === "openai"}
+                                onCheckedChange={() => setSelectedModel("openai")}
+                                className="focus:bg-slate-800 focus:text-white cursor-pointer"
+                            >
+                                OpenAI (GPT-5-Mini)
+                            </DropdownMenuCheckboxItem>
+                            <DropdownMenuCheckboxItem
+                                checked={selectedModel === "google"}
+                                onCheckedChange={() => setSelectedModel("google")}
+                                className="focus:bg-slate-800 focus:text-white cursor-pointer"
+                            >
+                                Google (Gemini-3-Flash)
+                            </DropdownMenuCheckboxItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 )}
             </div>
 
-            <div className="flex items-center gap-3">
-                {/* Pulsing Mic Indicator */}
-                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.5)]">
-                    <Mic className="h-5 w-5" />
-                </div>
+            <div className="flex items-center gap-3 relative z-50">
+                {/* Audio Recorder in Header */}
+                {onTranscription && (
+                    <AudioRecorder onTranscription={onTranscription} />
+                )}
             </div>
 
             <div className="flex gap-2 flex-wrap justify-end">

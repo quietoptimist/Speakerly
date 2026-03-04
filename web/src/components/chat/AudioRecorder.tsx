@@ -71,20 +71,17 @@ export function AudioRecorder({ onTranscription }: AudioRecorderProps) {
     };
 
     return (
-        <div className="flex items-center gap-3 w-full bg-slate-900 border border-slate-800 rounded-lg p-2">
-            <div className="flex-1 px-3 text-sm text-slate-400 font-mono">
+        <div className="flex items-center gap-3">
+            <div className="text-xs text-slate-400 font-mono text-right w-32">
                 {isRecording ? (
-                    <span className="flex items-center gap-2 text-red-400">
-                        <span className="animate-pulse h-2 w-2 bg-red-500 rounded-full"></span>
-                        Listening (Tap stop when partner finishes)...
+                    <span className="flex items-center gap-2 text-red-400 justify-end">
+                        Listening <span className="animate-pulse h-2 w-2 bg-red-500 rounded-full"></span>
                     </span>
                 ) : isProcessing ? (
-                    <span className="flex items-center gap-2 text-cyan-400">
-                        <Loader2 className="h-4 w-4 animate-spin" /> Transcribing audio...
+                    <span className="flex items-center gap-2 text-cyan-400 justify-end">
+                        <Loader2 className="h-3 w-3 animate-spin" /> Transcribing
                     </span>
-                ) : (
-                    "Tap microphone to record partner speech"
-                )}
+                ) : null}
             </div>
 
             {!isRecording ? (
@@ -93,18 +90,18 @@ export function AudioRecorder({ onTranscription }: AudioRecorderProps) {
                     disabled={isProcessing}
                     variant="secondary"
                     size="icon"
-                    className="rounded-full bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30"
+                    className="w-14 h-14 rounded-full bg-cyan-500/20 hover:bg-cyan-500/40 text-cyan-300 border-2 border-cyan-500/50 shadow-[0_0_20px_rgba(6,182,212,0.5)] transition-all hover:scale-110 active:scale-95"
                 >
-                    <Mic className="h-5 w-5" />
+                    <Mic className="h-7 w-7" />
                 </Button>
             ) : (
                 <Button
                     onClick={stopRecording}
                     variant="destructive"
                     size="icon"
-                    className="rounded-full animate-pulse shadow-[0_0_15px_rgba(239,68,68,0.5)]"
+                    className="w-14 h-14 rounded-full animate-pulse shadow-[0_0_25px_rgba(239,68,68,0.6)] border-2 border-red-400 hover:scale-110 active:scale-95"
                 >
-                    <Square className="h-5 w-5 fill-current" />
+                    <Square className="h-6 w-6 fill-current" />
                 </Button>
             )}
         </div>

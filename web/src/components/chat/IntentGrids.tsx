@@ -8,35 +8,11 @@ interface IntentGridsProps {
     setGrid2: (val: { x: number; y: number }) => void;
     grid3: { x: number; y: number };
     setGrid3: (val: { x: number; y: number }) => void;
-    isQuestion: boolean;
-    setIsQuestion: (val: boolean) => void;
 }
 
-export function IntentGrids({ grid1, setGrid1, grid2, setGrid2, grid3, setGrid3, isQuestion, setIsQuestion }: IntentGridsProps) {
+export function IntentGrids({ grid1, setGrid1, grid2, setGrid2, grid3, setGrid3 }: IntentGridsProps) {
     return (
         <div className="flex flex-col gap-4 w-full">
-            {/* Question / Statement Toggle */}
-            <div className="flex justify-center">
-                <div className="flex bg-slate-900 rounded-full p-1 border border-slate-800">
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setIsQuestion(false)}
-                        className={`rounded-full px-6 transition-colors ${!isQuestion ? 'bg-cyan-500/20 text-cyan-400' : 'text-slate-400 hover:text-white'}`}
-                    >
-                        Statement
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setIsQuestion(true)}
-                        className={`rounded-full px-6 transition-colors ${isQuestion ? 'bg-purple-500/20 text-purple-400' : 'text-slate-400 hover:text-white'}`}
-                    >
-                        Question
-                    </Button>
-                </div>
-            </div>
-
             {/* The 3 Grids */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 place-items-center w-full">
                 <ClickableGrid

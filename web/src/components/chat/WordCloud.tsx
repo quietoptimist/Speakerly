@@ -13,6 +13,8 @@ interface WordCloudProps {
     requestedCount: number;
     onCountChange: (delta: number) => void;
     isLoading: boolean;
+    isQuestion: boolean;
+    setIsQuestion: (val: boolean) => void;
 }
 
 // Generate consistent colors based on theme string
@@ -34,11 +36,31 @@ const getThemeColor = (theme: string) => {
     return colors[Math.abs(hash) % colors.length];
 };
 
-export function WordCloud({ words, selectedWords, onWordToggle, requestedCount, onCountChange, isLoading }: WordCloudProps) {
+export function WordCloud({ words, selectedWords, onWordToggle, requestedCount, onCountChange, isLoading, isQuestion, setIsQuestion }: WordCloudProps) {
     return (
         <div className="flex flex-col h-full bg-slate-900/50 rounded-lg border border-slate-800 p-3 relative overflow-hidden">
             <div className="flex justify-between items-start mb-2 shrink-0">
-                <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Suggested Topics & Words</h2>
+                <div className="flex flex-col gap-2">
+                    <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Suggested Topics & Words</h2>
+                    <div className="flex bg-slate-900/80 rounded-full p-0.5 border border-slate-800 w-fit">
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setIsQuestion(false)}
+                            className={`h-6 text-[10px] rounded-full px-4 transition-colors ${!isQuestion ? 'bg-cyan-500/20 text-cyan-400' : 'text-slate-400 hover:text-white'}`}
+                        >
+                            Statement
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setIsQuestion(true)}
+                            className={`h-6 text-[10px] rounded-full px-4 transition-colors ${isQuestion ? 'bg-purple-500/20 text-purple-400' : 'text-slate-400 hover:text-white'}`}
+                        >
+                            Question
+                        </Button>
+                    </div>
+                </div>
                 <div className="flex flex-col items-center bg-slate-800 rounded-md overflow-hidden border border-slate-700">
                     <button
                         onClick={() => onCountChange(1)}

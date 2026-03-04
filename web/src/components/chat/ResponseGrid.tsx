@@ -113,7 +113,7 @@ export function ResponseGrid({ responses, isLoading, onResponseSelect }: Respons
                                 <CardTitle className="text-2xl font-bold tracking-tight">{res.title}</CardTitle>
                             </CardHeader>
                             <CardContent className="text-center">
-                                <p className="text-sm opacity-80">{res.body}</p>
+                                <p className="text-2xl tracking-normal opacity-90">{res.body}</p>
                             </CardContent>
                         </Card>
                     );

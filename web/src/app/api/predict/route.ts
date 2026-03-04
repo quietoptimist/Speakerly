@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
+import { GoogleGenAI } from "@google/genai";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const googleAi = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "YOUR_GOOGLE_KEY" });
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { transcript, chatHistory = [], grid1, grid2, grid3, isQuestion, context, selectedWords = [], requestedWordCount = 10 } = body;
+    const { transcript, chatHistory = [], grid1, grid2, grid3, isQuestion, context, selectedWords = [], requestedWordCount = 10, model = "openai" } = body;
 
     if (typeof transcript !== "string") {
       return NextResponse.json({ error: "Transcript must be a string" }, { status: 400 });
@@ -45,7 +45,7 @@ export async function POST(req: Request) {
 
     const contextContext = context && context.length > 0 ? `Current Context: ${context.join(", ")}` : "No specific context.";
     const selectedWordsContext = selectedWords && selectedWords.length > 0
-      ? `\nCRITICAL: The user has explicitly selected these words: [${selectedWords.join(", ")}]. You MUST make the 4 sentence options about these specific topics.`
+      ? `\nCRITICAL: The user has explicitly selected these words/topics: [${selectedWords.join(", ")}]. You MUST incorporate the CONCEPTS of ALL these explicitly selected words into EACH of the 4 sentence options. Do not make separate sentences for each word; synthesize them into a single cohesive, natural thought. For example, if they select "latte" and "muffin", suggest "I would like a latte and a muffin please". If they select "coffee" and "size", suggest something like "What sizes do you have for coffee?" or "I would like a large coffee". Be smart about how the ideas combine naturally.`
       : "";
 
     // Format Conversation History
@@ -81,7 +81,7 @@ User's Intentions:
 
 CRITICAL RULES:
 1. Generate exactly 4 distinct sentence options.
-2. The options MUST perfectly align with the User's Intentions (Tone, Stance, Time, etc.) and Selected Words. If the stance is "disagreeing", provide 4 polite but firm ways to disagree.
+2. The options MUST perfectly align with the User's Intentions (Tone, Stance, Time, etc.) and Selected Words. If multiple words are selected, MUST synthesize them into single natural sentences that make logical sense. If the stance is "disagreeing", provide 4 polite but firm ways to disagree.
 3. You must also generate exactly ${requestedWordCount} individual words or short phrases that are highly relevant to the potential next steps of the conversation. 
    - If the Sentence Type is "ASK A QUESTION", heavily prioritize outputting question words (who, what, where, when, why, how, can, do) as well as specific drill-down topics related to the Context (e.g. if Context is "grocery", suggest "where", "vegetables", "tomatoes", "cost", etc) to allow the user to narrow down their question in steps.
    - Include numbers, days, times if relevant. 
@@ -110,16 +110,31 @@ CRITICAL RULES:
 
 Ensure the JSON is perfectly formatted.`;
 
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: fullPrompt }
-      ],
-      temperature: 0.7,
-    });
+    let resultText = '{"responses": []}';
 
-    const resultText = response.choices[0]?.message?.content || '{"responses": []}';
+    if (model === "google") {
+      const gResponse = await googleAi.models.generateContent({
+        model: "gemini-2.5-flash", // Fallback until 3-flash is fully rolled out in the SDK
+        contents: fullPrompt,
+        config: {
+          responseMimeType: "application/json",
+          temperature: 0.7,
+        }
+      });
+      resultText = gResponse.text || resultText;
+    } else {
+      // default: openai
+      const oResponse = await openai.chat.completions.create({
+        model: "gpt-5-mini",
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: fullPrompt }
+        ]
+        // Removed temperature: 0.7 because o1/o3/gpt-5 models only support default temperature
+      });
+      resultText = oResponse.choices[0]?.message?.content || resultText;
+    }
+
     return NextResponse.json(JSON.parse(resultText));
 
   } catch (error: any) {

@@ -27,6 +27,7 @@ export default function Home() {
 
   const [isLoading, setIsLoading] = useState(false);
   const [isManualMode, setIsManualMode] = useState(false); // Feature requested in PRD
+  const [selectedModel, setSelectedModel] = useState("openai");
 
   const lastHistoryLength = useRef(0);
 
@@ -41,7 +42,7 @@ export default function Home() {
       }, 800);
       return () => clearTimeout(delayDebounceFn);
     }
-  }, [transcript, grid1, grid2, grid3, isQuestion, isManualMode, activeContexts, selectedWords, requestedWordCount, chatHistory]);
+  }, [transcript, grid1, grid2, grid3, isQuestion, isManualMode, activeContexts, selectedWords, requestedWordCount, chatHistory, selectedModel]);
 
   const handleNewTranscription = (text: string) => {
     setChatHistory(prev => [...prev, { role: "partner", text }]);
@@ -63,7 +64,8 @@ export default function Home() {
           isQuestion,
           context: activeContexts,
           selectedWords,
-          requestedWordCount
+          requestedWordCount,
+          model: selectedModel
         }),
       });
       const data = await res.json();
@@ -103,6 +105,8 @@ export default function Home() {
       <TopBar
         isManualMode={isManualMode} setIsManualMode={setIsManualMode}
         activeContexts={activeContexts} setActiveContexts={setActiveContexts}
+        onTranscription={handleNewTranscription}
+        selectedModel={selectedModel} setSelectedModel={setSelectedModel}
       />
 
       <div className="flex-1 flex flex-col p-4 gap-4 overflow-hidden max-w-4xl mx-auto w-full">
@@ -129,7 +133,6 @@ export default function Home() {
             grid1={grid1} setGrid1={setGrid1}
             grid2={grid2} setGrid2={setGrid2}
             grid3={grid3} setGrid3={setGrid3}
-            isQuestion={isQuestion} setIsQuestion={setIsQuestion}
           />
         </div>
 
@@ -141,6 +144,8 @@ export default function Home() {
             requestedCount={requestedWordCount}
             onCountChange={(delta) => setRequestedWordCount(Math.max(10, Math.min(40, requestedWordCount + delta)))}
             isLoading={isLoading}
+            isQuestion={isQuestion}
+            setIsQuestion={setIsQuestion}
             onWordToggle={(word) => {
               setSelectedWords(prev =>
                 prev.includes(word) ? prev.filter(w => w !== word) : [...prev, word]
@@ -172,32 +177,6 @@ export default function Home() {
               setSelectedWords([]);
             }}
           />
-        </div>
-
-        {/* Real STT Input Area */}
-        <div className="shrink-0 pt-2 flex flex-col gap-2">
-          <p className="text-xs text-slate-500">Audio Input</p>
-          <AudioRecorder
-            onTranscription={handleNewTranscription}
-          />
-
-          {/* Keep debug input for dev testing without breaking microphone */}
-          <div className="opacity-30 hover:opacity-100 transition-opacity flex items-center gap-2 mt-4">
-            <span className="text-[10px] text-slate-600 whitespace-nowrap">Keyboard Debug:</span>
-            <Input
-              value={transcript}
-              onChange={(e) => {
-                setTranscript(e.target.value);
-                if (!isManualMode && e.target.value.length > 5) {
-                  // Lazy debounce for debug typing
-                  const delay = setTimeout(() => generatePredictions(e.target.value), 1000);
-                  return () => clearTimeout(delay);
-                }
-              }}
-              className="bg-slate-900 border-slate-800 text-slate-500 h-6 text-xs"
-              placeholder="Type to bypass mic..."
-            />
-          </div>
         </div>
       </div>
     </main>
