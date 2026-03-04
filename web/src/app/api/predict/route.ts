@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { GoogleGenAI } from "@google/genai";
+import Anthropic from "@anthropic-ai/sdk";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const googleAi = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "YOUR_GOOGLE_KEY" });
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || "YOUR_ANTHROPIC_KEY" });
 
 export async function POST(req: Request) {
   try {
@@ -114,7 +116,7 @@ Ensure the JSON is perfectly formatted.`;
 
     if (model === "google") {
       const gResponse = await googleAi.models.generateContent({
-        model: "gemini-2.5-flash", // Fallback until 3-flash is fully rolled out in the SDK
+        model: "gemini-2.5-flash",
         contents: fullPrompt,
         config: {
           responseMimeType: "application/json",
@@ -122,6 +124,24 @@ Ensure the JSON is perfectly formatted.`;
         }
       });
       resultText = gResponse.text || resultText;
+    } else if (model === "anthropic") {
+      const aResponse = await anthropic.messages.create({
+        model: "claude-haiku-4-5",
+        max_tokens: 1500,
+        temperature: 0.7,
+        system: "You are the predictive Brain of an AAC app. Output ONLY valid JSON according to the schema provided.",
+        messages: [
+          { role: "user", content: fullPrompt }
+        ]
+      });
+      if (aResponse.content[0].type === "text") {
+        let text = aResponse.content[0].text.trim();
+        // Anthropic might wrap with markdown codeblocks
+        if (text.startsWith("```json")) text = text.substring(7);
+        else if (text.startsWith("```")) text = text.substring(3);
+        if (text.endsWith("```")) text = text.substring(0, text.length - 3);
+        resultText = text.trim();
+      }
     } else {
       // default: openai
       const oResponse = await openai.chat.completions.create({

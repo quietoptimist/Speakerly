@@ -92,7 +92,14 @@ export function TopBar({
                                 onCheckedChange={() => setSelectedModel("google")}
                                 className="focus:bg-slate-800 focus:text-white cursor-pointer"
                             >
-                                Google (Gemini-3-Flash)
+                                Google (Gemini-2.5-Flash)
+                            </DropdownMenuCheckboxItem>
+                            <DropdownMenuCheckboxItem
+                                checked={selectedModel === "anthropic"}
+                                onCheckedChange={() => setSelectedModel("anthropic")}
+                                className="focus:bg-slate-800 focus:text-white cursor-pointer"
+                            >
+                                Anthropic (Claude-Haiku-4.5)
                             </DropdownMenuCheckboxItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
