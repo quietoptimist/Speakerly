@@ -39,46 +39,50 @@ const getThemeColor = (theme: string) => {
 export function WordCloud({ words, selectedWords, onWordToggle, requestedCount, onCountChange, isLoading, isQuestion, setIsQuestion }: WordCloudProps) {
     return (
         <div className="flex flex-col h-full bg-slate-900/50 rounded-lg border border-slate-800 p-3 relative overflow-hidden">
-            <div className="flex justify-between items-start mb-2 shrink-0">
-                <div className="flex flex-col gap-2">
-                    <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Suggested Topics & Words</h2>
-                    <div className="flex bg-slate-900/80 rounded-full p-0.5 border border-slate-800 w-fit">
+            <div className="grid grid-cols-[1fr_auto_1fr] items-start mb-4 shrink-0 w-full">
+                <div className="flex justify-start pt-3">
+                    <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Suggested Topics</h2>
+                </div>
+
+                <div className="flex justify-center">
+                    <div className="flex bg-slate-900/80 rounded-full p-1 border border-slate-800 shadow-lg">
                         <Button
                             variant="ghost"
-                            size="sm"
                             onClick={() => setIsQuestion(false)}
-                            className={`h-6 text-[10px] rounded-full px-4 transition-colors ${!isQuestion ? 'bg-cyan-500/20 text-cyan-400' : 'text-slate-400 hover:text-white'}`}
+                            className={`h-12 text-lg font-semibold rounded-full px-8 transition-colors ${!isQuestion ? 'bg-cyan-500/20 text-cyan-400 shadow-md ring-1 ring-cyan-500/50' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'}`}
                         >
                             Statement
                         </Button>
                         <Button
                             variant="ghost"
-                            size="sm"
                             onClick={() => setIsQuestion(true)}
-                            className={`h-6 text-[10px] rounded-full px-4 transition-colors ${isQuestion ? 'bg-purple-500/20 text-purple-400' : 'text-slate-400 hover:text-white'}`}
+                            className={`h-12 text-lg font-semibold rounded-full px-8 transition-colors ${isQuestion ? 'bg-purple-500/20 text-purple-400 shadow-md ring-1 ring-purple-500/50' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'}`}
                         >
                             Question
                         </Button>
                     </div>
                 </div>
-                <div className="flex flex-col items-center bg-slate-800 rounded-md overflow-hidden border border-slate-700">
-                    <button
-                        onClick={() => onCountChange(1)}
-                        disabled={requestedCount >= 40 || isLoading}
-                        className="px-2 py-1 hover:bg-slate-700 disabled:opacity-50 transition-colors"
-                    >
-                        <Plus className="h-3 w-3 text-slate-300" />
-                    </button>
-                    <div className="text-[10px] font-mono text-slate-400 border-y border-slate-700 w-full text-center py-0.5">
-                        {requestedCount}
+
+                <div className="flex justify-end">
+                    <div className="flex flex-col items-center bg-slate-800 rounded-md overflow-hidden border border-slate-700">
+                        <button
+                            onClick={() => onCountChange(1)}
+                            disabled={requestedCount >= 40 || isLoading}
+                            className="px-2 py-1 hover:bg-slate-700 disabled:opacity-50 transition-colors"
+                        >
+                            <Plus className="h-3 w-3 text-slate-300" />
+                        </button>
+                        <div className="text-[10px] font-mono text-slate-400 border-y border-slate-700 w-full text-center py-0.5">
+                            {requestedCount}
+                        </div>
+                        <button
+                            onClick={() => onCountChange(-1)}
+                            disabled={requestedCount <= 10 || isLoading}
+                            className="px-2 py-1 hover:bg-slate-700 disabled:opacity-50 transition-colors"
+                        >
+                            <Minus className="h-3 w-3 text-slate-300" />
+                        </button>
                     </div>
-                    <button
-                        onClick={() => onCountChange(-1)}
-                        disabled={requestedCount <= 10 || isLoading}
-                        className="px-2 py-1 hover:bg-slate-700 disabled:opacity-50 transition-colors"
-                    >
-                        <Minus className="h-3 w-3 text-slate-300" />
-                    </button>
                 </div>
             </div>
 

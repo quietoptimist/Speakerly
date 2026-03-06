@@ -18,16 +18,20 @@ export default function Home() {
   const [grid2, setGrid2] = useState({ x: 2, y: 2 }); // Stance/Understanding
   const [grid3, setGrid3] = useState({ x: 2, y: 2 }); // Time/Urgency
   const [isQuestion, setIsQuestion] = useState(false); // Question/Statement
-  const [responses, setResponses] = useState<ResponseItem[]>([]);
+  const [statementResponses, setStatementResponses] = useState<ResponseItem[]>([]);
+  const [questionResponses, setQuestionResponses] = useState<ResponseItem[]>([]);
 
   // Word Cloud States
-  const [suggestedWords, setSuggestedWords] = useState<SuggestedWord[]>([]);
+  const [statementWords, setStatementWords] = useState<SuggestedWord[]>([]);
+  const [questionWords, setQuestionWords] = useState<SuggestedWord[]>([]);
+  const [dynamicQuickReplies, setDynamicQuickReplies] = useState<string[]>([]);
   const [selectedWords, setSelectedWords] = useState<string[]>([]);
   const [requestedWordCount, setRequestedWordCount] = useState(20);
 
   const [isLoading, setIsLoading] = useState(false);
-  const [isManualMode, setIsManualMode] = useState(false); // Feature requested in PRD
+  const [isManualMode, setIsManualMode] = useState(true); // Default to manual mode requested by user
   const [selectedModel, setSelectedModel] = useState("openai");
+  const [apiError, setApiError] = useState<string | null>(null);
 
   const lastHistoryLength = useRef(0);
 
@@ -42,7 +46,9 @@ export default function Home() {
       }, 800);
       return () => clearTimeout(delayDebounceFn);
     }
-  }, [transcript, grid1, grid2, grid3, isQuestion, isManualMode, activeContexts, selectedWords, requestedWordCount, chatHistory, selectedModel]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transcript, grid1, grid2, grid3, isManualMode, activeContexts, selectedWords, requestedWordCount, chatHistory, selectedModel]);
+  // Note: removed isQuestion from dependencies to prevent re-fetching on toggle (instant local switch)
 
   const handleNewTranscription = (text: string) => {
     setChatHistory(prev => [...prev, { role: "partner", text }]);
@@ -69,31 +75,45 @@ export default function Home() {
         }),
       });
       const data = await res.json();
-      if (data.responses) {
-        setResponses(data.responses);
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to fetch predictions from AI provider.");
       }
-      if (data.words) {
-        setSuggestedWords((prevSuggested) => {
-          // Ensure previously selected words remain in the list so they can be deselected
-          const previousSelectedObjects = prevSuggested.filter(w => selectedWords.includes(w.word));
-          const allWords = [...previousSelectedObjects, ...(data.words as SuggestedWord[])];
+      setApiError(null); // Clear previous errors on success
 
-          // Deduplicate words (case-insensitive) to prevent React key errors
-          const uniqueMap = new Map<string, SuggestedWord>();
-          allWords.forEach(w => {
-            if (w && w.word && !uniqueMap.has(w.word.toLowerCase())) {
-              uniqueMap.set(w.word.toLowerCase(), w);
-            }
-          });
+      if (data.statementResponses) {
+        setStatementResponses(data.statementResponses);
+      }
+      if (data.questionResponses) {
+        setQuestionResponses(data.questionResponses);
+      }
+      const mergeWords = (prevSuggested: SuggestedWord[], newWords: SuggestedWord[]) => {
+        if (!newWords || newWords.length === 0) return prevSuggested;
+        const previousSelectedObjects = prevSuggested.filter(w => selectedWords.includes(w.word));
+        const allWords = [...previousSelectedObjects, ...newWords];
 
-          // Sort words by theme to keep them relatively stable visually
-          return Array.from(uniqueMap.values()).sort((a, b) => a.theme.localeCompare(b.theme));
+        const uniqueMap = new Map<string, SuggestedWord>();
+        allWords.forEach(w => {
+          if (w && w.word && !uniqueMap.has(w.word.toLowerCase())) {
+            uniqueMap.set(w.word.toLowerCase(), w);
+          }
         });
-      } else {
-        console.warn("API did not return a words array. Payload received:", data);
+
+        return Array.from(uniqueMap.values()).sort((a, b) => a.theme.localeCompare(b.theme));
+      };
+
+      if (data.statementWords) {
+        setStatementWords(prev => mergeWords(prev, data.statementWords));
       }
-    } catch (error) {
+      if (data.questionWords) {
+        setQuestionWords(prev => mergeWords(prev, data.questionWords));
+      }
+      if (data.quickReplies) {
+        setDynamicQuickReplies(data.quickReplies);
+      }
+    } catch (error: any) {
       console.error("Failed to generate responses", error);
+      setApiError(error.message || "An unknown network error occurred.");
     } finally {
       setIsLoading(false);
     }
@@ -110,8 +130,17 @@ export default function Home() {
       />
 
       <div className="flex-1 flex flex-col p-4 gap-4 overflow-hidden max-w-4xl mx-auto w-full">
+        {/* Tier 4: Intent & Sentiment Grids */}
+        <div className="shrink-0 pb-2 border-b border-slate-800/50">
+          <IntentGrids
+            grid1={grid1} setGrid1={setGrid1}
+            grid2={grid2} setGrid2={setGrid2}
+            grid3={grid3} setGrid3={setGrid3}
+          />
+        </div>
+
         {/* Tier 2: Transcript History */}
-        <div className="shrink-0 h-[15%] min-h-[100px]">
+        <div className="shrink-0 h-[12%] min-h-[90px]">
           <Transcript
             messages={chatHistory}
             onClear={() => {
@@ -122,24 +151,10 @@ export default function Home() {
           />
         </div>
 
-        {/* Tier 3: Quick Backchannels */}
-        <div className="shrink-0">
-          <QuickReplies />
-        </div>
-
-        {/* Tier 4: Intent & Sentiment Grids */}
-        <div className="shrink-0 pt-4 pb-2 border-y border-slate-800/50">
-          <IntentGrids
-            grid1={grid1} setGrid1={setGrid1}
-            grid2={grid2} setGrid2={setGrid2}
-            grid3={grid3} setGrid3={setGrid3}
-          />
-        </div>
-
         {/* Tier 4.5: Word Cloud */}
-        <div className="shrink-0 h-[20%] min-h-[120px]">
+        <div className="shrink-0 h-[15%] min-h-[110px] pt-2 border-t border-slate-800/50">
           <WordCloud
-            words={suggestedWords}
+            words={isQuestion ? questionWords : statementWords}
             selectedWords={selectedWords}
             requestedCount={requestedWordCount}
             onCountChange={(delta) => setRequestedWordCount(Math.max(10, Math.min(40, requestedWordCount + delta)))}
@@ -150,6 +165,16 @@ export default function Home() {
               setSelectedWords(prev =>
                 prev.includes(word) ? prev.filter(w => w !== word) : [...prev, word]
               );
+            }}
+          />
+        </div>
+
+        {/* Tier 3: Quick Backchannels */}
+        <div className="shrink-0 pt-2 pb-2">
+          <QuickReplies
+            dynamicReplies={dynamicQuickReplies}
+            onReplySelect={(text) => {
+              setChatHistory(prev => [...prev, { role: "user", text }]);
             }}
           />
         </div>
@@ -167,7 +192,7 @@ export default function Home() {
             </div>
           )}
           <ResponseGrid
-            responses={responses}
+            responses={isQuestion ? questionResponses : statementResponses}
             isLoading={isLoading}
             onResponseSelect={(response) => {
               setChatHistory(prev => [...prev, { role: "user", text: response.body }]);
@@ -179,6 +204,13 @@ export default function Home() {
           />
         </div>
       </div>
+
+      {/* Footer / Error Banner */}
+      {apiError && (
+        <div className="bg-red-500/20 border-t border-red-500/50 p-2 text-red-200 text-xs text-center flex items-center justify-center gap-2 mt-auto shrink-0 z-50">
+          <span className="font-semibold">AI Error:</span> {apiError}
+        </div>
+      )}
     </main>
   );
 }

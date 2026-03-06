@@ -86,7 +86,7 @@ export function ResponseGrid({ responses, isLoading, onResponseSelect }: Respons
                 </div>
             )}
 
-            <div className="grid grid-cols-2 grid-rows-2 gap-4 h-full pb-4">
+            <div className="grid grid-cols-2 grid-rows-3 gap-4 h-full pb-4">
                 {responses.map((res, i) => {
                     const resId = res.id ?? res.title ?? String(i);
                     const isPlaying = playingId === resId;
