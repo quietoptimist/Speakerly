@@ -21,10 +21,11 @@ interface WordCloudProps {
 }
 
 // Generate consistent colors based on theme string
-const getThemeColor = (theme: string) => {
+const getThemeColor = (theme?: string) => {
     let hash = 0;
-    for (let i = 0; i < theme.length; i++) {
-        hash = theme.charCodeAt(i) + ((hash << 5) - hash);
+    const safeTheme = theme || "general";
+    for (let i = 0; i < safeTheme.length; i++) {
+        hash = safeTheme.charCodeAt(i) + ((hash << 5) - hash);
     }
     const colors = [
         "bg-blue-500/20 text-blue-300 border-blue-500/30",
@@ -107,7 +108,7 @@ export function WordCloud({ words, selectedWords, onWordToggle, requestedCount, 
                         <Loader2 className="h-5 w-5 text-cyan-500 animate-spin opacity-50" />
                     </div>
                 ) : (
-                    <div className={`flex flex-wrap gap-2 content-start min-h-full pb-2 transition-opacity ${isLoading || isWordsLoading ? "opacity-50 pointer-events-none" : ""}`}>
+                    <div className="flex flex-wrap gap-2 content-start min-h-full pb-2 transition-opacity">
                         {words.map((w) => {
                             const isSelected = selectedWords.includes(w.word);
                             const themeColor = getThemeColor(w.theme);

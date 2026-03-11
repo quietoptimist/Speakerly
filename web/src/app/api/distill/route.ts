@@ -1,29 +1,9 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import OpenAI from 'openai'
+import { getDistillPrompt } from '@/lib/prompts'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-
-const DISTILL_PROMPT = `You are analyzing conversation logs for an AAC (Augmentative and Alternative Communication) user.
-Given the following recent conversations and existing learned profile, extract NEW insights about the user's:
-- Communication preferences and patterns
-- Frequently discussed topics
-- Relationship dynamics mentioned
-- Vocabulary habits and favourite phrases
-- Daily routine observations
-- Emotional patterns or mood indicators
-- Things they care about or find important
-
-Existing learned profile:
-{learned_md}
-
-Recent conversations:
-{conversation_logs}
-
-Output an updated Markdown profile preserving existing valid insights and adding new ones.
-Remove anything contradicted by recent evidence.
-Use clear section headers and bullet points.
-Write in third person (e.g. "John prefers..." not "You prefer...").`
 
 export async function POST() {
   const supabase = await createClient()
@@ -63,9 +43,7 @@ export async function POST() {
   }).join('\n\n')
 
   // 4. Build the distillation prompt
-  const prompt = DISTILL_PROMPT
-    .replace('{learned_md}', existingLearned)
-    .replace('{conversation_logs}', formattedLogs)
+  const prompt = getDistillPrompt(existingLearned, formattedLogs)
 
   // 5. Call the LLM
   try {

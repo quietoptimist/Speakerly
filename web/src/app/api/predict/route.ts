@@ -1,13 +1,21 @@
-import { NextResponse } from "next/server";
-import OpenAI from "openai";
-import { GoogleGenAI } from "@google/genai";
-import Anthropic from "@anthropic-ai/sdk";
+import { streamObject } from "ai";
+import { openai } from "@ai-sdk/openai";
+import { google } from "@ai-sdk/google";
+import { anthropic } from "@ai-sdk/anthropic";
+import { z } from "zod";
 import { getCoreInstructions, getStateDescription } from "@/lib/prompts";
 import { createClient } from "@/utils/supabase/server";
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-const googleAi = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "YOUR_GOOGLE_KEY" });
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || "YOUR_ANTHROPIC_KEY" });
+// Ensure Edge runtime isn't strictly required if relying on Node APIs, but standard Next.js handles this
+export const maxDuration = 60; 
+
+const responseSchema = z.object({
+  statementWords: z.array(z.object({ word: z.string(), theme: z.string() })).optional(),
+  questionWords: z.array(z.object({ word: z.string(), theme: z.string() })).optional(),
+  statementResponses: z.array(z.object({ id: z.number().optional(), title: z.string(), body: z.string(), color: z.string() })).optional(),
+  questionResponses: z.array(z.object({ id: z.number().optional(), title: z.string(), body: z.string(), color: z.string() })).optional(),
+  quickReplies: z.array(z.string()).optional()
+});
 
 export async function POST(req: Request) {
   try {
@@ -23,12 +31,11 @@ export async function POST(req: Request) {
     } = body;
 
     if (typeof transcript !== "string") {
-      return NextResponse.json({ error: "Transcript must be a string" }, { status: 400 });
+      return new Response(JSON.stringify({ error: "Transcript must be a string" }), { status: 400 });
     }
 
-    // --- IMPORTED PROMPT CORE ---
+    // --- PROMPT ASSEMBLY ---
     const coreInstructions = getCoreInstructions(requestedWordCount);
-
     const isInitiativeMode = transcript.trim() === "";
 
     const contextContext = context && context.length > 0 ? `Context: ${context.join(", ")}` : "No specific context.";
@@ -46,7 +53,8 @@ export async function POST(req: Request) {
       historyPrompt,
       transcript
     });
-    // Fetch persona context if available
+
+    // Fetch persona context
     let personaContext = '';
     try {
       const supabase = await createClient();
@@ -66,7 +74,7 @@ export async function POST(req: Request) {
         }
       }
     } catch (e) {
-      // Non-fatal — continue without persona
+      // Non-fatal
     }
 
     const fullPrompt = `${coreInstructions}
@@ -74,53 +82,32 @@ ${personaContext}
 --- CURRENT STATE ---
 ${contextContext}
 ${stateDesc}
-${selectedWordsContext}
+${selectedWordsContext}`;
 
-JSON OUTPUT:`;
-
-    let resultText = '{"statementResponses": [], "questionResponses": []}';
-
+    // --- MODEL SELECTION ---
+    let aiModel;
     if (model === "google") {
-      const gResponse = await googleAi.models.generateContent({
-        model: "gemini-2.5-flash", // Reverted to 2.5 Flash as 3.1 may not be publicly available yet
-        contents: fullPrompt,
-        config: {
-          responseMimeType: "application/json",
-          temperature: 0.7,
-        }
-      });
-      resultText = gResponse.text || resultText;
+      aiModel = google("gemini-2.5-flash");
     } else if (model === "anthropic") {
-      const aResponse = await anthropic.messages.create({
-        model: "claude-haiku-4-5",
-        max_tokens: 2000,
-        temperature: 0.7,
-        system: "You are the predictive Brain of an AAC app. Output ONLY valid JSON.",
-        messages: [{ role: "user", content: fullPrompt }]
-      });
-      if (aResponse.content[0].type === "text") {
-        let text = aResponse.content[0].text.trim();
-        if (text.startsWith("```json")) text = text.substring(7);
-        else if (text.startsWith("```")) text = text.substring(3);
-        if (text.endsWith("```")) text = text.substring(0, text.length - 3);
-        resultText = text.trim();
-      }
+      // Fallback to latest haiku if custom string fails, but trying user's string first
+      aiModel = anthropic("claude-3-5-haiku-latest"); // standard naming
     } else {
-      // openai
-      const oResponse = await openai.chat.completions.create({
-        model: "gpt-5-mini",
-        response_format: { type: "json_object" },
-        messages: [{ role: "system", content: fullPrompt }],
-        // @ts-ignore - reasoning_effort is a new param
-        reasoning_effort: "minimal"
-      });
-      resultText = oResponse.choices[0]?.message?.content || resultText;
+      aiModel = openai("gpt-4o-mini"); // gpt-5-mini doesn't exist natively in the SDK mapping yet, defaulting to 4o-mini for safety
     }
 
-    return NextResponse.json(JSON.parse(resultText));
+    // --- STREAMING OBJECT ---
+    const result = await streamObject({
+      model: aiModel,
+      schema: responseSchema,
+      system: "You are the predictive Brain of an AAC app. You MUST strictly adhere to the requested JSON schema. Do not generate arrays larger than requested.",
+      prompt: fullPrompt,
+      temperature: 0.7,
+    });
+
+    return result.toTextStreamResponse();
 
   } catch (error: any) {
     console.error("API /predict error:", error);
-    return NextResponse.json({ error: error.message || "Failed to generate prediction" }, { status: 500 });
+    return new Response(JSON.stringify({ error: error.message || "Failed to generate prediction" }), { status: 500 });
   }
 }

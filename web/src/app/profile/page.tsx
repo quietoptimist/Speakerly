@@ -53,7 +53,8 @@ export default function ProfilePage() {
             const res = await fetch('/api/persona')
             if (res.ok) {
                 const data = await res.json()
-                setProfileMd(data.profile_md || DEFAULT_PROFILE)
+                // If updated_at is null, they've never saved a profile before, so show the template
+                setProfileMd(data.updated_at === null ? DEFAULT_PROFILE : data.profile_md)
                 setLearnedMd(data.learned_md || '')
             }
         } catch (err) {
@@ -72,7 +73,7 @@ export default function ProfilePage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     profile_md: profileMd,
-                    ...(editingLearned ? { learned_md: learnedMd } : {})
+                    learned_md: learnedMd
                 })
             })
             if (res.ok) {

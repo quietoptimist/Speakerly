@@ -11,6 +11,16 @@ import { ResponseGrid, ResponseItem } from "@/components/chat/ResponseGrid";
 import { AudioRecorder } from "@/components/chat/AudioRecorder";
 import { WordCloud, SuggestedWord } from "@/components/chat/WordCloud";
 import { Input } from "@/components/ui/input";
+import { experimental_useObject as useObject } from '@ai-sdk/react';
+import { z } from 'zod';
+
+const responseSchema = z.object({
+  statementWords: z.array(z.object({ word: z.string(), theme: z.string() })).optional(),
+  questionWords: z.array(z.object({ word: z.string(), theme: z.string() })).optional(),
+  statementResponses: z.array(z.object({ id: z.number().optional(), title: z.string(), body: z.string(), color: z.string() })).optional(),
+  questionResponses: z.array(z.object({ id: z.number().optional(), title: z.string(), body: z.string(), color: z.string() })).optional(),
+  quickReplies: z.array(z.string()).optional()
+});
 
 export default function Home() {
   const [transcript, setTranscript] = useState("");
@@ -38,7 +48,56 @@ export default function Home() {
   const [replyDraft, setReplyDraft] = useState("");
   const [isSpeaking, setIsSpeaking] = useState(false);
 
+  // Streaming AI hook
+  const { submit: submitPrediction, isLoading: isPredictLoading, object: predictionObject } = useObject({
+    api: "/api/predict",
+    schema: responseSchema,
+    onError: (err: Error) => {
+      console.error("Prediction stream error:", err);
+      setApiError("Failed to fetch predictions from AI provider.");
+      setIsLoading(false);
+    },
+    onFinish: () => {
+      setIsLoading(false);
+    }
+  });
 
+  // Sync streamed object into local UI state incrementally
+  useEffect(() => {
+    if (!predictionObject) return;
+
+    if (predictionObject.statementResponses) {
+      setStatementResponses(predictionObject.statementResponses as ResponseItem[]);
+    }
+    if (predictionObject.questionResponses) {
+      setQuestionResponses(predictionObject.questionResponses as ResponseItem[]);
+    }
+    if (predictionObject.quickReplies) {
+      setDynamicQuickReplies(predictionObject.quickReplies as string[]);
+    }
+
+    const mergeWords = (prevSuggested: SuggestedWord[], newWords: SuggestedWord[]) => {
+      if (!newWords || newWords.length === 0) return prevSuggested;
+      const previousSelectedObjects = prevSuggested.filter(w => selectedWords.includes(w.word));
+      const allWords = [...previousSelectedObjects, ...newWords];
+
+      const uniqueMap = new Map<string, SuggestedWord>();
+      allWords.forEach(w => {
+        if (w && w.word && !uniqueMap.has(w.word.toLowerCase())) {
+          uniqueMap.set(w.word.toLowerCase(), w);
+        }
+      });
+
+      return Array.from(uniqueMap.values());
+    };
+
+    if (predictionObject.statementWords) {
+      setStatementWords(prev => mergeWords(prev, predictionObject.statementWords as SuggestedWord[]));
+    }
+    if (predictionObject.questionWords) {
+      setQuestionWords(prev => mergeWords(prev, predictionObject.questionWords as SuggestedWord[]));
+    }
+  }, [predictionObject, selectedWords]);
   // Log each message individually to conversation_log + usage_events (fire-and-forget)
   const logUsageEvent = useCallback((role: string, phrase: string, phraseType: string = 'statement') => {
     const contextPath = activeContextPath.map(n => n.name);
@@ -148,63 +207,21 @@ export default function Home() {
 
     setIsLoading(true);
     setApiError(null);
-    try {
-      const res = await fetch("/api/predict", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          transcript: currentTranscript,
-          chatHistory,
-          isQuestion,
-          context: activeContextPath.map(n => n.name),
-          selectedWords,
-          requestedWordCount,
-          model: selectedModel
-        }),
-      });
-      const data = await res.json();
 
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to fetch predictions from AI provider.");
-      }
-      setApiError(null); // Clear previous errors on success
+    // Clear old responses so the stream visually fills in the empty slots
+    setStatementResponses([]);
+    setQuestionResponses([]);
+    setDynamicQuickReplies([]);
 
-      if (data.statementResponses) {
-        setStatementResponses(data.statementResponses);
-      }
-      if (data.questionResponses) {
-        setQuestionResponses(data.questionResponses);
-      }
-      const mergeWords = (prevSuggested: SuggestedWord[], newWords: SuggestedWord[]) => {
-        if (!newWords || newWords.length === 0) return prevSuggested;
-        const previousSelectedObjects = prevSuggested.filter(w => selectedWords.includes(w.word));
-        const allWords = [...previousSelectedObjects, ...newWords];
-
-        const uniqueMap = new Map<string, SuggestedWord>();
-        allWords.forEach(w => {
-          if (w && w.word && !uniqueMap.has(w.word.toLowerCase())) {
-            uniqueMap.set(w.word.toLowerCase(), w);
-          }
-        });
-
-        return Array.from(uniqueMap.values()).sort((a, b) => a.theme.localeCompare(b.theme));
-      };
-
-      if (data.statementWords) {
-        setStatementWords(prev => mergeWords(prev, data.statementWords));
-      }
-      if (data.questionWords) {
-        setQuestionWords(prev => mergeWords(prev, data.questionWords));
-      }
-      if (data.quickReplies) {
-        setDynamicQuickReplies(data.quickReplies);
-      }
-    } catch (error: any) {
-      console.error("Failed to generate responses", error);
-      setApiError(error.message || "An unknown network error occurred.");
-    } finally {
-      setIsLoading(false);
-    }
+    submitPrediction({
+      transcript: currentTranscript,
+      chatHistory,
+      isQuestion,
+      context: activeContextPath.map(n => n.name),
+      selectedWords: currentSelectedWords,
+      requestedWordCount,
+      model: selectedModel
+    });
   };
 
   const fetchFastWords = async (currentTranscript: string, currentSelectedWords: string[]) => {

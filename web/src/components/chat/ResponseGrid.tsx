@@ -47,13 +47,12 @@ export function ResponseGrid({ responses, isLoading, onResponseSelect, onRespons
 
     return (
         <div className="h-full flex flex-col pt-2 relative">
-            <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">AI Responses</h2>
-
-            {isLoading && (
-                <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-950/50 backdrop-blur-sm rounded-lg">
-                    <Loader2 className="h-10 w-10 text-cyan-500 animate-spin" />
-                </div>
-            )}
+            <div className="flex justify-between items-center mb-3">
+                <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">AI Responses</h2>
+                {isLoading && (
+                    <Loader2 className="h-4 w-4 text-cyan-500 animate-spin opacity-70" />
+                )}
+            </div>
 
             <div className="grid grid-cols-2 grid-rows-3 gap-4 h-full pb-4">
                 {responses.map((res, i) => {
