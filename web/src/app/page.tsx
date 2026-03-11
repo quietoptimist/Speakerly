@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { TopBar } from "@/components/layout/TopBar";
 import { Transcript, ChatMessage } from "@/components/chat/Transcript";
 import { QuickReplies } from "@/components/chat/QuickReplies";
-import { IntentGrids } from "@/components/chat/IntentGrids";
+import { ContextHierarchy, ContextNode, ContextSuggestion } from "@/components/chat/ContextHierarchy";
 import { ResponseGrid, ResponseItem } from "@/components/chat/ResponseGrid";
 import { AudioRecorder } from "@/components/chat/AudioRecorder";
 import { WordCloud, SuggestedWord } from "@/components/chat/WordCloud";
@@ -13,10 +13,8 @@ import { Input } from "@/components/ui/input";
 export default function Home() {
   const [transcript, setTranscript] = useState("");
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
-  const [activeContexts, setActiveContexts] = useState<string[]>(["📍 Cafe", "🗣️ Barista"]); // Dynamic contexts
-  const [grid1, setGrid1] = useState({ x: 2, y: 2 }); // Brevity/Seriousness
-  const [grid2, setGrid2] = useState({ x: 2, y: 2 }); // Stance/Understanding
-  const [grid3, setGrid3] = useState({ x: 2, y: 2 }); // Time/Urgency
+  const [activeContextPath, setActiveContextPath] = useState<ContextNode[]>([]);
+  const [contextSuggestions, setContextSuggestions] = useState<ContextSuggestion[]>([]);
   const [isQuestion, setIsQuestion] = useState(false); // Question/Statement
   const [statementResponses, setStatementResponses] = useState<ResponseItem[]>([]);
   const [questionResponses, setQuestionResponses] = useState<ResponseItem[]>([]);
@@ -43,21 +41,68 @@ export default function Home() {
 
     if (!isManualMode || isNewTurn) {
       const delayDebounceFn = setTimeout(() => {
-        generatePredictions(transcript);
-      }, 800);
+        generatePredictions(transcript, selectedWords);
+      }, 1000);
       return () => clearTimeout(delayDebounceFn);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [transcript, grid1, grid2, grid3, isManualMode, activeContexts, selectedWords, requestedWordCount, chatHistory, selectedModel]);
+  }, [transcript, isManualMode, activeContextPath, contextSuggestions, selectedWords, requestedWordCount, chatHistory, selectedModel]);
   // Note: removed isQuestion from dependencies to prevent re-fetching on toggle (instant local switch)
+
+  // Handle instant bypass for pre-defined context suggestions outside of manual generation constraints
+  useEffect(() => {
+    const isInitiativeMode = transcript.trim() === "";
+    
+    // Only apply if user hasn't typed anything and hasn't manually selected words
+    if (isInitiativeMode && selectedWords.length === 0) {
+      if (contextSuggestions.length > 0) {
+        setIsLoading(false);
+        setApiError(null);
+        
+        const words = contextSuggestions.filter(s => s.type === 'keyword').map(s => ({ 
+            word: s.text, 
+            theme: "Context",
+            relatedWords: [] 
+        }));
+        
+        const sentences = contextSuggestions.filter(s => s.type === 'sentence').map((s, i) => {
+            const isQ = s.text.endsWith("?");
+            return {
+                id: Date.now() + i,
+                title: s.text.length > 30 ? s.text.substring(0, 30) + "..." : s.text,
+                body: s.text,
+                color: (isQ ? "cyan" : "emerald") as any
+            };
+        });
+        
+        const qResponses = sentences.filter(s => s.body.endsWith("?"));
+        const sResponses = sentences.filter(s => !s.body.endsWith("?"));
+
+        setStatementWords(words); 
+        setQuestionWords(words); 
+        setStatementResponses(sResponses);
+        setQuestionResponses(qResponses);
+        setDynamicQuickReplies(["Yes", "No", "Please", "Thanks", "Sorry"]);
+      } else if (activeContextPath.length > 0) {
+        // If they clicked a context but it has no suggestions, clear the UI
+        setStatementWords([]); 
+        setQuestionWords([]); 
+        setStatementResponses([]);
+        setQuestionResponses([]);
+      }
+    }
+  }, [contextSuggestions, transcript, selectedWords, activeContextPath]);
 
   const handleNewTranscription = (text: string) => {
     setChatHistory(prev => [...prev, { role: "partner", text }]);
     setTranscript(text);
   };
 
-  const generatePredictions = async (currentTranscript: string) => {
+  const generatePredictions = async (currentTranscript: string, currentSelectedWords: string[]) => {
+    if (isManualMode && !currentTranscript && currentSelectedWords.length === 0) return;
+
     setIsLoading(true);
+    setApiError(null);
     try {
       const res = await fetch("/api/predict", {
         method: "POST",
@@ -65,11 +110,8 @@ export default function Home() {
         body: JSON.stringify({
           transcript: currentTranscript,
           chatHistory,
-          grid1,
-          grid2,
-          grid3,
           isQuestion,
-          context: activeContexts,
+          context: activeContextPath.map(n => n.name),
           selectedWords,
           requestedWordCount,
           model: selectedModel
@@ -130,7 +172,7 @@ export default function Home() {
           transcript: currentTranscript,
           chatHistory,
           isQuestion,
-          context: activeContexts,
+          context: activeContextPath.map(n => n.name),
           selectedWords: currentSelectedWords,
           requestedWordCount,
           model: selectedModel
@@ -175,18 +217,17 @@ export default function Home() {
       {/* Tier 1: Top Bar */}
       <TopBar
         isManualMode={isManualMode} setIsManualMode={setIsManualMode}
-        activeContexts={activeContexts} setActiveContexts={setActiveContexts}
         onTranscription={handleNewTranscription}
         selectedModel={selectedModel} setSelectedModel={setSelectedModel}
       />
 
       <div className="flex-1 flex flex-col p-4 gap-4 overflow-hidden max-w-4xl mx-auto w-full">
-        {/* Tier 4: Intent & Sentiment Grids */}
-        <div className="shrink-0 pb-2 border-b border-slate-800/50">
-          <IntentGrids
-            grid1={grid1} setGrid1={setGrid1}
-            grid2={grid2} setGrid2={setGrid2}
-            grid3={grid3} setGrid3={setGrid3}
+        {/* Tier 1.5: Context Hierarchy */}
+        <div className="shrink-0">
+          <ContextHierarchy 
+             activeContextPath={activeContextPath}
+             setActiveContextPath={setActiveContextPath}
+             onSuggestionsChange={setContextSuggestions}
           />
         </div>
 
@@ -244,7 +285,7 @@ export default function Home() {
           {isManualMode && (
             <div className="flex justify-end pr-1">
               <button
-                onClick={() => generatePredictions(transcript)}
+                onClick={() => generatePredictions(transcript, selectedWords)}
                 className="text-sm font-semibold text-cyan-400 hover:text-cyan-300 flex items-center gap-1 bg-cyan-500/10 border border-cyan-500/30 px-4 py-1.5 rounded-full shadow-[0_0_10px_rgba(6,182,212,0.2)] hover:bg-cyan-500/20 hover:scale-105 active:scale-95 transition-all"
               >
                 Generate Now
@@ -257,8 +298,6 @@ export default function Home() {
             onResponseSelect={(response) => {
               setChatHistory(prev => [...prev, { role: "user", text: response.body }]);
               setTranscript(""); // Resets to Initiative Mode
-              setGrid2({ x: 2, y: 2 });
-              setGrid3({ x: 2, y: 2 });
               setSelectedWords([]);
             }}
           />

@@ -14,9 +14,6 @@ export async function POST(req: Request) {
     const {
       transcript,
       chatHistory = [],
-      grid1,
-      grid2,
-      grid3,
       isQuestion,
       context,
       selectedWords = [],
@@ -33,21 +30,6 @@ export async function POST(req: Request) {
 
     const isInitiativeMode = transcript.trim() === "";
 
-    // Map grid coordinates to prompt descriptions
-    const brevityDescriptions = ["extremely short, brief", "short and concise", "normal length", "detailed", "elaborate"];
-    const seriousnessDescriptions = ["funny/joking", "playful", "neutral", "serious", "professional"];
-    const stanceDescriptions = ["strongly disagreeing", "lightly disagreeing", "neutral", "agreeing", "strongly agreeing"];
-    const understandingDescriptions = ["confused", "unsure", "following", "understands main points", "understands perfectly"];
-    const timeDescriptions = ["distant past", "recent past", "present moment", "near future", "distant future"];
-    const urgencyDescriptions = ["relaxed", "casual", "normal", "important", "emergency"];
-
-    const brevityDesc = brevityDescriptions[grid1?.x ?? 2];
-    const toneDesc = seriousnessDescriptions[grid1?.y ?? 2];
-    const stanceDesc = stanceDescriptions[grid2?.x ?? 2];
-    const understandingDesc = understandingDescriptions[grid2?.y ?? 2];
-    const timeDesc = timeDescriptions[grid3?.x ?? 2];
-    const urgencyDesc = urgencyDescriptions[grid3?.y ?? 2];
-
     const contextContext = context && context.length > 0 ? `Context: ${context.join(", ")}` : "No specific context.";
     const selectedWordsContext = selectedWords && selectedWords.length > 0
       ? `\nUser Selected Words (MUST INCLUDE ALL): [${selectedWords.join(", ")}]`
@@ -61,13 +43,7 @@ export async function POST(req: Request) {
     const stateDesc = getStateDescription({
       isInitiativeMode,
       historyPrompt,
-      transcript,
-      toneDesc,
-      brevityDesc,
-      stanceDesc,
-      understandingDesc,
-      timeDesc,
-      urgencyDesc
+      transcript
     });
 
     const fullPrompt = `${coreInstructions}

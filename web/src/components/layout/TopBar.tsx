@@ -1,4 +1,4 @@
-import { Menu, Zap, Hand, Plus, X, Brain } from "lucide-react";
+import { Menu, Zap, Hand, Brain, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AudioRecorder } from "@/components/chat/AudioRecorder";
 import {
@@ -9,17 +9,11 @@ import {
     DropdownMenuLabel,
     DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-
-const AVAILABLE_CONTEXTS = [
-    "📍 Cafe", "🗣️ Barista", "👨‍⚕️ Doctor", "🏥 Hospital",
-    "🏠 Home", "👪 Family", "👔 Work", "🛒 Grocery Store"
-];
+import { logout } from "@/app/login/actions";
 
 interface TopBarProps {
     isManualMode?: boolean;
     setIsManualMode?: (val: boolean) => void;
-    activeContexts?: string[];
-    setActiveContexts?: (val: string[]) => void;
     onTranscription?: (text: string) => void;
     selectedModel?: string;
     setSelectedModel?: (val: string) => void;
@@ -27,19 +21,9 @@ interface TopBarProps {
 
 export function TopBar({
     isManualMode = false, setIsManualMode,
-    activeContexts = [], setActiveContexts,
     onTranscription,
     selectedModel = "openai", setSelectedModel
 }: TopBarProps) {
-
-    const toggleContext = (context: string) => {
-        if (!setActiveContexts) return;
-        if (activeContexts.includes(context)) {
-            setActiveContexts(activeContexts.filter(c => c !== context));
-        } else {
-            setActiveContexts([...activeContexts, context]);
-        }
-    };
 
     return (
         <header className="flex items-center justify-between p-4 bg-slate-900 border-b border-slate-800">
@@ -111,50 +95,20 @@ export function TopBar({
                 {onTranscription && (
                     <AudioRecorder onTranscription={onTranscription} />
                 )}
-            </div>
-
-            <div className="flex gap-2 flex-wrap justify-end">
-                {/* Context Pills */}
-                {activeContexts.map((ctx) => (
+                
+                {/* Logout Button */}
+                <form action={logout}>
                     <Button
-                        key={ctx}
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => toggleContext(ctx)}
-                        className="bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-red-400 rounded-full flex gap-1 items-center"
-                        title="Remove Context"
+                        variant="outline"
+                        size="icon"
+                        className="rounded-full border-slate-700 bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700"
+                        title="Sign Out"
                     >
-                        {ctx}
-                        <X className="h-3 w-3 opacity-50" />
+                        <LogOut className="h-4 w-4" />
                     </Button>
-                ))}
-
-                {/* Add Context Dropdown */}
-                {setActiveContexts && (
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="sm" className="rounded-full border-slate-700 border-dashed text-slate-400 hover:text-white bg-transparent">
-                                <Plus className="h-3 w-3 mr-1" />
-                                Add Context
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent className="w-56 bg-slate-900 border-slate-800 text-slate-200" align="end">
-                            <DropdownMenuLabel>Situational Context</DropdownMenuLabel>
-                            <DropdownMenuSeparator className="bg-slate-800" />
-                            {AVAILABLE_CONTEXTS.map(ctx => (
-                                <DropdownMenuCheckboxItem
-                                    key={ctx}
-                                    checked={activeContexts.includes(ctx)}
-                                    onCheckedChange={() => toggleContext(ctx)}
-                                    className="focus:bg-slate-800 focus:text-white cursor-pointer"
-                                >
-                                    {ctx}
-                                </DropdownMenuCheckboxItem>
-                            ))}
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                )}
+                </form>
             </div>
+
         </header>
     );
 }

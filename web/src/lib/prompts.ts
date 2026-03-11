@@ -32,23 +32,14 @@ interface StatePromptArgs {
     isInitiativeMode: boolean;
     historyPrompt: string;
     transcript: string;
-    toneDesc: string;
-    brevityDesc: string;
-    stanceDesc: string;
-    understandingDesc: string;
-    timeDesc: string;
-    urgencyDesc: string;
 }
 
 export const getStateDescription = (args: StatePromptArgs) => {
     if (args.isInitiativeMode) {
-        return `MODE: Initiative (User is starting/continuing)
-${args.historyPrompt}
-Intentions: Tone=${args.toneDesc}, Brevity=${args.brevityDesc}, Stance=${args.stanceDesc}, Time=${args.timeDesc}, Urgency=${args.urgencyDesc}`;
+        return `MODE: Initiative (User is starting/continuing)\n${args.historyPrompt}`;
     }
 
     return `MODE: Reaction (Replying to partner)
 ${args.historyPrompt}
-Partner's latest: "${args.transcript}"
-Intentions: Tone=${args.toneDesc}, Brevity=${args.brevityDesc}, Understanding=${args.understandingDesc}, Stance=${args.stanceDesc}, Time=${args.timeDesc}, Urgency=${args.urgencyDesc}`;
+Partner's latest: "${args.transcript}"`;
 };
