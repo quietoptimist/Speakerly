@@ -15,6 +15,9 @@ interface WordCloudProps {
     isLoading: boolean;
     isQuestion: boolean;
     setIsQuestion: (val: boolean) => void;
+    isManualMode?: boolean;
+    onUpdateWords?: () => void;
+    isWordsLoading?: boolean;
 }
 
 // Generate consistent colors based on theme string
@@ -36,12 +39,24 @@ const getThemeColor = (theme: string) => {
     return colors[Math.abs(hash) % colors.length];
 };
 
-export function WordCloud({ words, selectedWords, onWordToggle, requestedCount, onCountChange, isLoading, isQuestion, setIsQuestion }: WordCloudProps) {
+export function WordCloud({ words, selectedWords, onWordToggle, requestedCount, onCountChange, isLoading, isQuestion, setIsQuestion, isManualMode, onUpdateWords, isWordsLoading }: WordCloudProps) {
     return (
         <div className="flex flex-col h-full bg-slate-900/50 rounded-lg border border-slate-800 p-3 relative overflow-hidden">
             <div className="grid grid-cols-[1fr_auto_1fr] items-start mb-4 shrink-0 w-full">
-                <div className="flex justify-start pt-3">
+                <div className="flex flex-col justify-start pt-3 gap-2">
                     <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Suggested Topics</h2>
+                    {isManualMode && onUpdateWords && (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={onUpdateWords}
+                            disabled={isWordsLoading || isLoading}
+                            className="w-fit h-7 text-xs border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10 hover:text-cyan-300"
+                        >
+                            {isWordsLoading ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                            Refine
+                        </Button>
+                    )}
                 </div>
 
                 <div className="flex justify-center">
@@ -87,12 +102,12 @@ export function WordCloud({ words, selectedWords, onWordToggle, requestedCount, 
             </div>
 
             <div className="flex-1 overflow-y-auto">
-                {isLoading && words.length === 0 ? (
+                {(isLoading || isWordsLoading) && words.length === 0 ? (
                     <div className="flex items-center justify-center h-full">
                         <Loader2 className="h-5 w-5 text-cyan-500 animate-spin opacity-50" />
                     </div>
                 ) : (
-                    <div className={`flex flex-wrap gap-2 content-start min-h-full pb-2 transition-opacity ${isLoading ? "opacity-50 pointer-events-none" : ""}`}>
+                    <div className={`flex flex-wrap gap-2 content-start min-h-full pb-2 transition-opacity ${isLoading || isWordsLoading ? "opacity-50 pointer-events-none" : ""}`}>
                         {words.map((w) => {
                             const isSelected = selectedWords.includes(w.word);
                             const themeColor = getThemeColor(w.theme);

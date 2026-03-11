@@ -17,6 +17,17 @@ CRITICAL RULES:
 5. QUICK REPLIES: Generate 3-4 ultra-short (1-3 words max) plausible quick responses to the current context. Do NOT include basic ones like yes, no, please, thanks hello, goodbye, pardon.
 6. NO REPETITION: Do not return words the user already selected.`;
 
+export const getWordCloudInstructions = (requestedWordCount: number, isQuestion: boolean) => `You are the predictive "Brain" of an AAC app.
+You must generate approximately ${requestedWordCount} individual vocabulary words for the user to select, prioritizing ${isQuestion ? 'question-starters (who, what, why) and query topics' : 'statements and conversational topics'}.
+
+CRITICAL RULES:
+1. FORMAT: Output MUST be valid JSON with this exact schema:
+{
+  "words": [{ "word": "string", "theme": "string" }]
+}
+2. RELEVANCE: Create words heavily derived from the provided context, history, and selected words. 
+3. NO REPETITION: Do not return words the user has already selected.`;
+
 interface StatePromptArgs {
     isInitiativeMode: boolean;
     historyPrompt: string;

@@ -29,6 +29,7 @@ export default function Home() {
   const [requestedWordCount, setRequestedWordCount] = useState(20);
 
   const [isLoading, setIsLoading] = useState(false);
+  const [isWordsLoading, setIsWordsLoading] = useState(false);
   const [isManualMode, setIsManualMode] = useState(true); // Default to manual mode requested by user
   const [selectedModel, setSelectedModel] = useState("openai");
   const [apiError, setApiError] = useState<string | null>(null);
@@ -119,6 +120,56 @@ export default function Home() {
     }
   };
 
+  const fetchFastWords = async (currentTranscript: string, currentSelectedWords: string[]) => {
+    setIsWordsLoading(true);
+    try {
+      const res = await fetch("/api/predict-words", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          transcript: currentTranscript,
+          chatHistory,
+          isQuestion,
+          context: activeContexts,
+          selectedWords: currentSelectedWords,
+          requestedWordCount,
+          model: selectedModel
+        }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to fetch quick words from AI provider.");
+      }
+      setApiError(null);
+
+      const mergeWords = (prevSuggested: SuggestedWord[], newWords: SuggestedWord[]) => {
+        if (!newWords || newWords.length === 0) return prevSuggested;
+        const previousSelectedObjects = prevSuggested.filter(w => currentSelectedWords.includes(w.word));
+        const allWords = [...previousSelectedObjects, ...newWords];
+
+        const uniqueMap = new Map<string, SuggestedWord>();
+        allWords.forEach(w => {
+          if (w && w.word && !uniqueMap.has(w.word.toLowerCase())) {
+            uniqueMap.set(w.word.toLowerCase(), w);
+          }
+        });
+
+        return Array.from(uniqueMap.values()).sort((a, b) => a.theme.localeCompare(b.theme));
+      };
+
+      if (data.words) {
+        if (isQuestion) setQuestionWords(prev => mergeWords(prev, data.words));
+        else setStatementWords(prev => mergeWords(prev, data.words));
+      }
+    } catch (error: any) {
+      console.error("Failed to fetch fast words", error);
+      setApiError(error.message || "An unknown network error occurred.");
+    } finally {
+      setIsWordsLoading(false);
+    }
+  };
+
   return (
     <main className="flex flex-col h-screen bg-slate-950 text-slate-50 overflow-hidden">
       {/* Tier 1: Top Bar */}
@@ -161,10 +212,19 @@ export default function Home() {
             isLoading={isLoading}
             isQuestion={isQuestion}
             setIsQuestion={setIsQuestion}
+            isManualMode={isManualMode}
+            isWordsLoading={isWordsLoading}
+            onUpdateWords={() => fetchFastWords(transcript, selectedWords)}
             onWordToggle={(word) => {
-              setSelectedWords(prev =>
-                prev.includes(word) ? prev.filter(w => w !== word) : [...prev, word]
-              );
+              const newWords = selectedWords.includes(word)
+                ? selectedWords.filter(w => w !== word)
+                : [...selectedWords, word];
+              setSelectedWords(newWords);
+
+              if (!isManualMode) {
+                // Instantly fetch new words when clicked in Auto Mode
+                fetchFastWords(transcript, newWords);
+              }
             }}
           />
         </div>
