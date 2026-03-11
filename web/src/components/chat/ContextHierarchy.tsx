@@ -60,8 +60,24 @@ export function ContextHierarchy({ activeContextPath, setActiveContextPath, onSu
             setSuggestions(data.suggestions)
             setIsDefaultView(data.isUsingDefaults)
 
-            // If we have an active path, verify it exists in the new tree
-            // Otherwise reset it if it was deleted
+            // Re-map active path to the refreshed tree nodes so selection persists
+            if (activeContextPath.length > 0) {
+                const findNode = (nodes: ContextNode[], id: string): ContextNode | null => {
+                    for (const n of nodes) {
+                        if (n.id === id) return n
+                        const found = findNode(n.children || [], id)
+                        if (found) return found
+                    }
+                    return null
+                }
+                const newPath: ContextNode[] = []
+                for (const pathNode of activeContextPath) {
+                    const match = findNode(data.tree, pathNode.id)
+                    if (match) newPath.push(match)
+                    else break
+                }
+                setActiveContextPath(newPath)
+            }
         } catch (err: any) {
             setError(err.message)
         } finally {

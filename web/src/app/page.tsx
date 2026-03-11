@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { Volume2, Loader2 } from "lucide-react";
+import { speakText } from "@/lib/speech";
 import { TopBar } from "@/components/layout/TopBar";
 import { Transcript, ChatMessage } from "@/components/chat/Transcript";
 import { QuickReplies } from "@/components/chat/QuickReplies";
@@ -32,17 +34,19 @@ export default function Home() {
   const [selectedModel, setSelectedModel] = useState("openai");
   const [apiError, setApiError] = useState<string | null>(null);
 
-  const lastHistoryLength = useRef(0);
+  // Reply draft state
+  const [replyDraft, setReplyDraft] = useState("");
+  const [isSpeaking, setIsSpeaking] = useState(false);
 
-  // Log a usage event and conversation snapshot to the backend (fire-and-forget)
+
+  // Log each message individually to conversation_log + usage_events (fire-and-forget)
   const logUsageEvent = useCallback((role: string, phrase: string, phraseType: string = 'statement') => {
     const contextPath = activeContextPath.map(n => n.name);
-    const currentMessages = [...chatHistory, { role: role === 'partner' ? 'partner' : 'user', text: phrase }];
     fetch('/api/conversation-log', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        messages: currentMessages,
+        messages: [{ role: role === 'partner' ? 'partner' : 'user', text: phrase }],
         context_path: contextPath,
         usage_event: {
           role,
@@ -53,30 +57,28 @@ export default function Home() {
         }
       })
     }).catch(() => {}); // Non-blocking
-  }, [activeContextPath, selectedWords, chatHistory]);
+  }, [activeContextPath, selectedWords]);
 
-  // Archive conversation on session end (page unload)
+  // Speak text via browser TTS, add to chat, log, clear draft
+  const speakReply = (text: string) => {
+    setChatHistory(prev => [...prev, { role: 'user', text }]);
+    logUsageEvent('user', text, text.endsWith('?') ? 'question' : 'statement');
+    setReplyDraft('');
+    setTranscript('');
+    setSelectedWords([]);
+    
+    setIsSpeaking(true);
+    speakText(
+      text,
+      undefined,
+      () => setIsSpeaking(false)
+    );
+  };
+
+  // Auto-regenerate if sliders or contexts change (Auto mode only).
+  // In Manual mode, predictions only fire when the user clicks "Generate Now".
   useEffect(() => {
-    const handleUnload = () => {
-      if (chatHistory.length > 0) {
-        const contextPath = activeContextPath.map(n => n.name);
-        const blob = new Blob([JSON.stringify({
-          messages: chatHistory,
-          context_path: contextPath
-        })], { type: 'application/json' });
-        navigator.sendBeacon('/api/conversation-log', blob);
-      }
-    };
-    window.addEventListener('beforeunload', handleUnload);
-    return () => window.removeEventListener('beforeunload', handleUnload);
-  }, [chatHistory, activeContextPath]);
-
-  // Auto-regenerate if sliders or contexts change (Auto mode only), or ALWAYS if new conversation turn.
-  useEffect(() => {
-    const isNewTurn = chatHistory.length !== lastHistoryLength.current;
-    lastHistoryLength.current = chatHistory.length;
-
-    if (!isManualMode || isNewTurn) {
+    if (!isManualMode) {
       const delayDebounceFn = setTimeout(() => {
         generatePredictions(transcript, selectedWords);
       }, 1000);
@@ -286,6 +288,26 @@ export default function Home() {
           />
         </div>
 
+        {/* Reply Input Box */}
+        <div className="shrink-0 flex gap-2 items-center">
+          <input
+            type="text"
+            value={replyDraft}
+            onChange={(e) => setReplyDraft(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter' && replyDraft.trim()) speakReply(replyDraft.trim()); }}
+            placeholder="Type or click a suggestion to build your reply..."
+            className="flex-1 bg-slate-900 border border-slate-700 rounded-full px-4 py-2.5 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
+          />
+          <button
+            onClick={() => { if (replyDraft.trim()) speakReply(replyDraft.trim()); }}
+            disabled={!replyDraft.trim() || isSpeaking}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold transition-all active:scale-95"
+          >
+            {isSpeaking ? <Loader2 className="h-4 w-4 animate-spin" /> : <Volume2 className="h-4 w-4" />}
+            Speak
+          </button>
+        </div>
+
         {/* Tier 4.5: Word Cloud */}
         <div className="shrink-0 h-[15%] min-h-[110px] pt-2 border-t border-slate-800/50">
           <WordCloud
@@ -318,8 +340,10 @@ export default function Home() {
           <QuickReplies
             dynamicReplies={dynamicQuickReplies}
             onReplySelect={(text) => {
-              setChatHistory(prev => [...prev, { role: "user", text }]);
-              logUsageEvent('user', text, 'statement');
+              setReplyDraft(prev => prev ? `${prev} ${text}` : text);
+            }}
+            onReplySpeak={(text) => {
+              speakReply(text);
             }}
           />
         </div>
@@ -340,10 +364,10 @@ export default function Home() {
             responses={isQuestion ? questionResponses : statementResponses}
             isLoading={isLoading}
             onResponseSelect={(response) => {
-              setChatHistory(prev => [...prev, { role: "user", text: response.body }]);
-              logUsageEvent('user', response.body, response.body.endsWith('?') ? 'question' : 'statement');
-              setTranscript(""); // Resets to Initiative Mode
-              setSelectedWords([]);
+              setReplyDraft(prev => prev ? `${prev} ${response.body}` : response.body);
+            }}
+            onResponseSpeak={(response) => {
+              speakReply(response.body);
             }}
           />
         </div>

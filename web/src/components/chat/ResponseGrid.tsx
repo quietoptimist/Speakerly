@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, Volume2 } from "lucide-react";
-import { useState, useRef } from "react";
+import { useState } from "react";
+import { speakText, cancelSpeech } from "@/lib/speech";
 
 export interface ResponseItem {
     id?: number | string;
@@ -13,58 +14,26 @@ interface ResponseGridProps {
     responses: ResponseItem[];
     isLoading: boolean;
     onResponseSelect?: (response: ResponseItem) => void;
+    onResponseSpeak?: (response: ResponseItem) => void;
 }
 
-export function ResponseGrid({ responses, isLoading, onResponseSelect }: ResponseGridProps) {
+export function ResponseGrid({ responses, isLoading, onResponseSelect, onResponseSpeak }: ResponseGridProps) {
     const [playingId, setPlayingId] = useState<string | number | null>(null);
-    const [isSynthesizing, setIsSynthesizing] = useState<string | number | null>(null);
-    const audioRef = useRef<HTMLAudioElement | null>(null);
 
-    const handleSpeak = async (res: ResponseItem) => {
-        // Prevent overlapping audio
-        if (audioRef.current) {
-            audioRef.current.pause();
-            audioRef.current.currentTime = 0;
-        }
-
+    const handleSpeak = (res: ResponseItem) => {
+        cancelSpeech();
         const resId = res.id ?? res.title;
-        setIsSynthesizing(resId);
+        setPlayingId(resId);
 
-        if (onResponseSelect) {
-            onResponseSelect(res);
+        if (onResponseSpeak) {
+            onResponseSpeak(res);
         }
 
-        try {
-            const response = await fetch("/api/speak", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ text: res.body }),
-            });
-
-            if (!response.ok) throw new Error("TTS Failed");
-
-            const audioBlob = await response.blob();
-            const audioUrl = URL.createObjectURL(audioBlob);
-
-            const audio = new Audio(audioUrl);
-            audioRef.current = audio;
-
-            audio.onplay = () => {
-                setIsSynthesizing(null);
-                setPlayingId(resId);
-            };
-
-            audio.onended = () => {
-                setPlayingId(null);
-                URL.revokeObjectURL(audioUrl);
-            };
-
-            await audio.play();
-        } catch (error) {
-            console.error("Failed to play audio:", error);
-            setIsSynthesizing(null);
-            setPlayingId(null);
-        }
+        speakText(
+            res.body,
+            undefined,
+            () => setPlayingId(null)
+        );
     };
 
     const getColorClasses = (color: string) => {
@@ -90,21 +59,16 @@ export function ResponseGrid({ responses, isLoading, onResponseSelect }: Respons
                 {responses.map((res, i) => {
                     const resId = res.id ?? res.title ?? String(i);
                     const isPlaying = playingId === resId;
-                    const isLoadingAudio = isSynthesizing === resId;
 
                     return (
                         <Card
                             key={resId}
-                            onClick={() => handleSpeak(res)}
+                            onClick={() => onResponseSelect?.(res)}
+                            onDoubleClick={(e) => { e.preventDefault(); handleSpeak(res); }}
                             className={`bg-slate-900/40 cursor-pointer flex flex-col justify-center transition-all duration-200 ${isPlaying ? 'scale-95 ring-2 ring-white/50 bg-slate-800' : 'active:scale-95'
                                 } ${getColorClasses(res.color)}`}
                         >
                             <CardHeader className="pb-2 text-center relative">
-                                {isLoadingAudio && (
-                                    <div className="absolute top-2 right-2">
-                                        <Loader2 className="h-4 w-4 animate-spin opacity-50" />
-                                    </div>
-                                )}
                                 {isPlaying && (
                                     <div className="absolute top-2 right-2">
                                         <Volume2 className="h-4 w-4 animate-pulse fill-white" />

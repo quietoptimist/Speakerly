@@ -1,38 +1,47 @@
 import { NextResponse } from "next/server";
-import OpenAI from "openai";
 
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-});
-
-export async function POST(req: Request) {
+export async function GET(req: Request) {
     try {
-        const body = await req.json();
-        const { text, voice = "alloy" } = body;
+        const { searchParams } = new URL(req.url);
+        const text = searchParams.get('text');
+        const voice = searchParams.get('voice') || "alloy";
 
         if (!text) {
-            return NextResponse.json({ error: "Text is required" }, { status: 400 });
+            return new NextResponse("Text is required", { status: 400 });
         }
 
-        const mp3 = await openai.audio.speech.create({
-            model: "tts-1",
-            voice: voice,
-            input: text,
+        // Fetch directly from OpenAI API to bypass SDK buffering and stream the raw response body
+        // This allows the browser to start playing the MP3 while it is still generating.
+        const response = await fetch("https://api.openai.com/v1/audio/speech", {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                model: "tts-1",
+                voice: voice,
+                input: text,
+                response_format: "mp3"
+            })
         });
 
-        const buffer = Buffer.from(await mp3.arrayBuffer());
+        if (!response.ok) {
+            const err = await response.text();
+            throw new Error(`OpenAI API error: ${err}`);
+        }
 
-        // Return audio stream directly
-        return new NextResponse(buffer, {
+        // Stream the response directly to the client
+        return new NextResponse(response.body, {
             status: 200,
             headers: {
                 "Content-Type": "audio/mpeg",
-                "Content-Length": buffer.length.toString(),
+                "Cache-Control": "public, s-maxage=31536000, max-age=31536000", // Cache indefinitely on CDN
             }
         });
 
     } catch (error: any) {
         console.error("API /speak error:", error);
-        return NextResponse.json({ error: error.message || "Failed to generate speech" }, { status: 500 });
+        return new NextResponse(error.message || "Failed to generate speech", { status: 500 });
     }
 }
