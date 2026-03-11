@@ -3,6 +3,7 @@ import OpenAI from "openai";
 import { GoogleGenAI } from "@google/genai";
 import Anthropic from "@anthropic-ai/sdk";
 import { getCoreInstructions, getStateDescription } from "@/lib/prompts";
+import { createClient } from "@/utils/supabase/server";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const googleAi = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "YOUR_GOOGLE_KEY" });
@@ -45,9 +46,31 @@ export async function POST(req: Request) {
       historyPrompt,
       transcript
     });
+    // Fetch persona context if available
+    let personaContext = '';
+    try {
+      const supabase = await createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: persona } = await supabase
+          .from('user_personas')
+          .select('profile_md, learned_md')
+          .eq('user_id', user.id)
+          .single();
+        
+        if (persona) {
+          const parts: string[] = [];
+          if (persona.profile_md?.trim()) parts.push(`## About the User\n${persona.profile_md}`);
+          if (persona.learned_md?.trim()) parts.push(`## Learned Preferences\n${persona.learned_md}`);
+          if (parts.length > 0) personaContext = `\n--- USER PERSONA ---\n${parts.join('\n\n')}\n`;
+        }
+      }
+    } catch (e) {
+      // Non-fatal — continue without persona
+    }
 
     const fullPrompt = `${coreInstructions}
-
+${personaContext}
 --- CURRENT STATE ---
 ${contextContext}
 ${stateDesc}

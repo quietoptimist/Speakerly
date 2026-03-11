@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { TopBar } from "@/components/layout/TopBar";
 import { Transcript, ChatMessage } from "@/components/chat/Transcript";
 import { QuickReplies } from "@/components/chat/QuickReplies";
@@ -34,6 +34,43 @@ export default function Home() {
 
   const lastHistoryLength = useRef(0);
 
+  // Log a usage event and conversation snapshot to the backend (fire-and-forget)
+  const logUsageEvent = useCallback((role: string, phrase: string, phraseType: string = 'statement') => {
+    const contextPath = activeContextPath.map(n => n.name);
+    const currentMessages = [...chatHistory, { role: role === 'partner' ? 'partner' : 'user', text: phrase }];
+    fetch('/api/conversation-log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messages: currentMessages,
+        context_path: contextPath,
+        usage_event: {
+          role,
+          context_path: contextPath,
+          selected_topics: selectedWords,
+          phrase_spoken: phrase,
+          phrase_type: phraseType
+        }
+      })
+    }).catch(() => {}); // Non-blocking
+  }, [activeContextPath, selectedWords, chatHistory]);
+
+  // Archive conversation on session end (page unload)
+  useEffect(() => {
+    const handleUnload = () => {
+      if (chatHistory.length > 0) {
+        const contextPath = activeContextPath.map(n => n.name);
+        const blob = new Blob([JSON.stringify({
+          messages: chatHistory,
+          context_path: contextPath
+        })], { type: 'application/json' });
+        navigator.sendBeacon('/api/conversation-log', blob);
+      }
+    };
+    window.addEventListener('beforeunload', handleUnload);
+    return () => window.removeEventListener('beforeunload', handleUnload);
+  }, [chatHistory, activeContextPath]);
+
   // Auto-regenerate if sliders or contexts change (Auto mode only), or ALWAYS if new conversation turn.
   useEffect(() => {
     const isNewTurn = chatHistory.length !== lastHistoryLength.current;
@@ -48,6 +85,11 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transcript, isManualMode, activeContextPath, contextSuggestions, selectedWords, requestedWordCount, chatHistory, selectedModel]);
   // Note: removed isQuestion from dependencies to prevent re-fetching on toggle (instant local switch)
+
+  // When context path changes, clear selected words so the new context's suggestions take priority
+  useEffect(() => {
+    setSelectedWords([]);
+  }, [activeContextPath]);
 
   // Handle instant bypass for pre-defined context suggestions outside of manual generation constraints
   useEffect(() => {
@@ -96,10 +138,11 @@ export default function Home() {
   const handleNewTranscription = (text: string) => {
     setChatHistory(prev => [...prev, { role: "partner", text }]);
     setTranscript(text);
+    logUsageEvent('partner', text, text.endsWith('?') ? 'question' : 'statement');
   };
 
   const generatePredictions = async (currentTranscript: string, currentSelectedWords: string[]) => {
-    if (isManualMode && !currentTranscript && currentSelectedWords.length === 0) return;
+    if (isManualMode && !currentTranscript && currentSelectedWords.length === 0 && activeContextPath.length === 0) return;
 
     setIsLoading(true);
     setApiError(null);
@@ -276,6 +319,7 @@ export default function Home() {
             dynamicReplies={dynamicQuickReplies}
             onReplySelect={(text) => {
               setChatHistory(prev => [...prev, { role: "user", text }]);
+              logUsageEvent('user', text, 'statement');
             }}
           />
         </div>
@@ -297,6 +341,7 @@ export default function Home() {
             isLoading={isLoading}
             onResponseSelect={(response) => {
               setChatHistory(prev => [...prev, { role: "user", text: response.body }]);
+              logUsageEvent('user', response.body, response.body.endsWith('?') ? 'question' : 'statement');
               setTranscript(""); // Resets to Initiative Mode
               setSelectedWords([]);
             }}

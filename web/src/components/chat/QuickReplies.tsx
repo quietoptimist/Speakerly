@@ -60,7 +60,7 @@ export function QuickReplies({ dynamicReplies = [], onReplySelect }: QuickReplie
     return (
         <div className="flex flex-col gap-2">
             <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Quick Actions</h2>
-            <div className="flex space-x-3 overflow-x-auto pb-2 scrollbar-none">
+            <div className="flex flex-wrap gap-2 overflow-y-auto max-h-[140px] pb-2 scrollbar-none">
                 {allReplies.map((reply) => {
                     const isProcessing = isSynthesizing === reply;
                     const isPlaying = playingId === reply;
@@ -72,7 +72,7 @@ export function QuickReplies({ dynamicReplies = [], onReplySelect }: QuickReplie
                             variant="outline"
                             onClick={() => handleSpeak(reply)}
                             disabled={isActive}
-                            className={`rounded-full px-6 py-6 text-lg font-medium whitespace-nowrap transition-all duration-200 relative
+                            className={`rounded-full px-4 py-3 text-base font-medium whitespace-nowrap transition-all duration-200 relative
                                 ${isActive
                                     ? "border-emerald-500/50 bg-emerald-500/20 text-white shadow-[0_0_15px_rgba(16,185,129,0.3)] scale-95"
                                     : "border-cyan-500/30 text-cyan-400 bg-slate-900/50 hover:bg-cyan-500/10 hover:text-cyan-300 shadow-[0_0_10px_rgba(6,182,212,0.1)] active:scale-95"}`}

@@ -1,4 +1,5 @@
-import { Menu, Zap, Hand, Brain, LogOut } from "lucide-react";
+import { Menu, Zap, Hand, Brain, LogOut, User } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { AudioRecorder } from "@/components/chat/AudioRecorder";
 import {
@@ -96,6 +97,18 @@ export function TopBar({
                     <AudioRecorder onTranscription={onTranscription} />
                 )}
                 
+                {/* Profile Button */}
+                <Link href="/profile">
+                    <Button
+                        variant="outline"
+                        size="icon"
+                        className="rounded-full border-slate-700 bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700"
+                        title="My Profile"
+                    >
+                        <User className="h-4 w-4" />
+                    </Button>
+                </Link>
+
                 {/* Logout Button */}
                 <form action={logout}>
                     <Button
