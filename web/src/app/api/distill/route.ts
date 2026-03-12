@@ -5,29 +5,60 @@ import { getDistillPrompt } from '@/lib/prompts'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
-export async function POST() {
+export async function POST(req: Request) {
   const supabase = await createClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // 1. Fetch current learned_md
-  const { data: persona } = await supabase
-    .from('user_personas')
-    .select('learned_md')
-    .eq('user_id', user.id)
-    .single()
+  // Parse optional interlocutor_id
+  let interlocutorId: string | null = null;
+  let interlocutorName: string | undefined = undefined;
+  try {
+     const body = await req.json();
+     interlocutorId = body.interlocutor_id || null;
+  } catch (e) {
+     // Ignore missing body
+  }
 
-  const existingLearned = persona?.learned_md || '(No existing profile yet)'
+  let existingLearned = '(No existing profile yet)';
+  
+  if (interlocutorId) {
+    const { data: interlocutor } = await supabase
+        .from('interlocutors')
+        .select('name, learned_md')
+        .eq('id', interlocutorId)
+        .eq('user_id', user.id)
+        .single()
+    existingLearned = interlocutor?.learned_md || existingLearned;
+    interlocutorName = interlocutor?.name;
+  } else {
+    // 1. Fetch current user learned_md
+    const { data: persona } = await supabase
+      .from('user_personas')
+      .select('learned_md')
+      .eq('user_id', user.id)
+      .single()
+    existingLearned = persona?.learned_md || existingLearned;
+  }
 
-  // 2. Fetch recent conversation logs (last 50 sessions)
-  const { data: logs } = await supabase
+  // 2. Fetch recent conversation logs
+  let query = supabase
     .from('conversation_log')
     .select('messages, context_path, created_at')
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
-    .limit(50)
+    .limit(50);
+    
+  if (interlocutorId) {
+     query = query.eq('interlocutor_id', interlocutorId);
+  } else {
+     // If distilling the main user, we can either look at all logs, 
+     // or just logs where interlocutor_id is null. Let's look at all logs for a holistic user view.
+  }
+
+  const { data: logs } = await query;
 
   if (!logs || logs.length === 0) {
     return NextResponse.json({ message: 'No conversations to distill yet' })
@@ -43,7 +74,7 @@ export async function POST() {
   }).join('\n\n')
 
   // 4. Build the distillation prompt
-  const prompt = getDistillPrompt(existingLearned, formattedLogs)
+  const prompt = getDistillPrompt(existingLearned, formattedLogs, interlocutorName)
 
   // 5. Call the LLM
   try {
@@ -59,16 +90,27 @@ export async function POST() {
     const newLearnedMd = completion.choices[0]?.message?.content || existingLearned
 
     // 6. Save the updated learned_md
-    const { error: updateError } = await supabase
-      .from('user_personas')
-      .upsert({
-        user_id: user.id,
-        learned_md: newLearnedMd,
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'user_id' })
-
-    if (updateError) {
-      return NextResponse.json({ error: updateError.message }, { status: 500 })
+    if (interlocutorId) {
+        const { error: updateError } = await supabase
+            .from('interlocutors')
+            .update({
+                learned_md: newLearnedMd,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', interlocutorId)
+            .eq('user_id', user.id);
+            
+        if (updateError) throw updateError;
+    } else {
+        const { error: updateError } = await supabase
+          .from('user_personas')
+          .upsert({
+            user_id: user.id,
+            learned_md: newLearnedMd,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'user_id' })
+          
+        if (updateError) throw updateError;
     }
 
     return NextResponse.json({

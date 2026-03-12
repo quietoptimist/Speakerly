@@ -10,7 +10,10 @@ Name:
 Age: 
 
 # People In My Life
-- (name, relationship)
+- FirstName LastName, brother
+- FirstName, wife
+- FirstName LastName (sister)
+- FirstName, caregiver
 
 # My Interests
 (hobbies, favourite topics, things you enjoy)
@@ -134,6 +137,11 @@ export default function ProfilePage() {
                     {saveMessage && (
                         <span className="text-sm text-emerald-400 animate-pulse">{saveMessage}</span>
                     )}
+                    <Link href="/profile/interlocutors">
+                        <Button variant="outline" className="text-slate-300 border-slate-700 bg-slate-900 rounded-full px-4 hover:bg-slate-800 mr-2">
+                             Manage People I Talk To
+                        </Button>
+                    </Link>
                     <Button
                         onClick={handleSave}
                         disabled={isSaving}

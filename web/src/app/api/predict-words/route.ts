@@ -18,7 +18,8 @@ export async function POST(req: Request) {
             context,
             selectedWords = [],
             requestedWordCount = 10,
-            model = "openai"
+            model = "openai",
+            interlocutor_id = null
         } = body;
 
         const coreInstructions = getWordCloudInstructions(requestedWordCount, isQuestion);
@@ -35,7 +36,48 @@ export async function POST(req: Request) {
 
         const stateDesc = `Partner's latest: "${transcript}"\n${historyPrompt}`;
 
-        const fullPrompt = `${coreInstructions}\n\n--- CURRENT STATE ---\n${contextContext}\n${stateDesc}\n${selectedWordsContext}\n\nJSON OUTPUT:`;
+        // Fetch persona and interlocutor context
+        let personaContext = '';
+        try {
+            const { createClient } = await import('@/utils/supabase/server');
+            const supabase = await createClient();
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                const { data: persona } = await supabase
+                    .from('user_personas')
+                    .select('profile_md, learned_md')
+                    .eq('user_id', user.id)
+                    .single();
+                
+                if (persona) {
+                    const parts: string[] = [];
+                    if (persona.profile_md?.trim()) parts.push(`## About the User\n${persona.profile_md}`);
+                    if (persona.learned_md?.trim()) parts.push(`## Learned Preferences\n${persona.learned_md}`);
+                    if (parts.length > 0) personaContext = `\n--- USER PERSONA ---\n${parts.join('\n\n')}\n`;
+                }
+                
+                if (interlocutor_id) {
+                    const { data: interlocutor } = await supabase
+                        .from('interlocutors')
+                        .select('name, relationship, profile_md, learned_md')
+                        .eq('id', interlocutor_id)
+                        .eq('user_id', user.id)
+                        .single();
+
+                    if (interlocutor) {
+                        const parts: string[] = [];
+                        parts.push(`You are currently speaking to: ${interlocutor.name} ${interlocutor.relationship ? `(${interlocutor.relationship})` : ''}`);
+                        if (interlocutor.profile_md?.trim()) parts.push(`## About Them\n${interlocutor.profile_md}`);
+                        if (interlocutor.learned_md?.trim()) parts.push(`## Learned Interaction Habits\n${interlocutor.learned_md}`);
+                        personaContext += `\n--- INTERLOCUTOR CONTEXT ---\n${parts.join('\n\n')}\n`;
+                    }
+                }
+            }
+        } catch (e) {
+            // Non-fatal
+        }
+
+        const fullPrompt = `${coreInstructions}\n${personaContext}\n--- CURRENT STATE ---\n${contextContext}\n${stateDesc}\n${selectedWordsContext}\n\nJSON OUTPUT:`;
 
         let resultText = '{"words": []}';
 

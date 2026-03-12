@@ -27,7 +27,8 @@ export async function POST(req: Request) {
       context,
       selectedWords = [],
       requestedWordCount = 10,
-      model = "openai"
+      model = "openai",
+      interlocutor_id = null
     } = body;
 
     if (typeof transcript !== "string") {
@@ -71,6 +72,23 @@ export async function POST(req: Request) {
           if (persona.profile_md?.trim()) parts.push(`## About the User\n${persona.profile_md}`);
           if (persona.learned_md?.trim()) parts.push(`## Learned Preferences\n${persona.learned_md}`);
           if (parts.length > 0) personaContext = `\n--- USER PERSONA ---\n${parts.join('\n\n')}\n`;
+        }
+        
+        if (interlocutor_id) {
+          const { data: interlocutor } = await supabase
+            .from('interlocutors')
+            .select('name, relationship, profile_md, learned_md')
+            .eq('id', interlocutor_id)
+            .eq('user_id', user.id)
+            .single();
+
+          if (interlocutor) {
+             const parts: string[] = [];
+             parts.push(`You are currently speaking to: ${interlocutor.name} ${interlocutor.relationship ? `(${interlocutor.relationship})` : ''}`);
+             if (interlocutor.profile_md?.trim()) parts.push(`## About Them\n${interlocutor.profile_md}`);
+             if (interlocutor.learned_md?.trim()) parts.push(`## Learned Interaction Habits\n${interlocutor.learned_md}`);
+             personaContext += `\n--- INTERLOCUTOR CONTEXT ---\n${parts.join('\n\n')}\n`;
+          }
         }
       }
     } catch (e) {

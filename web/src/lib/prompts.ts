@@ -16,6 +16,7 @@ CRITICAL RULES:
    - If the "Partner" just asked a question (e.g. "What snack?"), provide direct, plausible answers as single words in the \`statementWords\` array.
    - If the User Persona specifies preferences related to the topic (e.g. favorite snacks), USE THEM directly.
    - If a specific Context (e.g., "Home & Kitchen", "Cafe") is active, restrict vocabulary to items and verbs found in that exact scenario.
+   - If a conversation is just starting, place greater emphasis on the interlocutor profile to ask about their interests and recent activities. 
    - DO NOT output generic, unrelated AAC vocabulary (e.g., countryside, family, weather) unless the conversation is specifically about that.
 4. VOCABULARY GENERATION: Generate exactly ${requestedWordCount} words for \`statementWords\` (focusing on nouns, verbs, and adjectives relevant to the topic). Generate exactly ${requestedWordCount} words for \`questionWords\` (focusing on question-starters and query topics).
 5. QUICK REPLIES: Generate 3-4 ultra-short (1-3 words max) plausible conversational quick responses. Do not output words like yes/no/thanks.
@@ -33,30 +34,31 @@ CRITICAL RULES:
 3. NO REPETITION: Do not return words the user has already selected.`;
 
 interface StatePromptArgs {
-    isInitiativeMode: boolean;
-    historyPrompt: string;
-    transcript: string;
+  isInitiativeMode: boolean;
+  historyPrompt: string;
+  transcript: string;
 }
 
 export const getStateDescription = (args: StatePromptArgs) => {
-    if (args.isInitiativeMode) {
-        return `MODE: Initiative (User is starting/continuing)\n${args.historyPrompt}`;
-    }
+  if (args.isInitiativeMode) {
+    return `MODE: Initiative (User is starting/continuing)\n${args.historyPrompt}`;
+  }
 
-    return `MODE: Reaction (Replying to partner)
+  return `MODE: Reaction (Replying to partner)
 ${args.historyPrompt}
 Partner's latest: "${args.transcript}"`;
 };
 
-export const getDistillPrompt = (existingLearned: string, formattedLogs: string) => `You are analyzing conversation logs for an AAC (Augmentative and Alternative Communication) user.
-Given the following recent conversations and existing learned profile, extract NEW, HIGHLY SPECIFIC insights about the user.
+export const getDistillPrompt = (existingLearned: string, formattedLogs: string, interlocutorName?: string) => `You are analyzing conversation logs for an AAC (Augmentative and Alternative Communication) user.
+Given the following recent conversations and existing learned profile, extract NEW, HIGHLY SPECIFIC insights about the ${interlocutorName ? `interaction habits with ${interlocutorName}` : 'user'}.
 
 CRITICAL RULES FOR EXTRACTION:
 1. IGNORE THE OBVIOUS: Do NOT extract generic, mundane human behaviors. If the user is at a coffee shop ordering coffee, do not write "User frequently orders drinks at cafes." That is useless.
 2. EXTRACT THE SPECIFIC: Only extract unique, identifying preferences, names, relationships, or habits. (e.g., "User prefers their coffee with oat milk and no sugar," "User has a friend named Sarah," "User uses a wheelchair").
-3. SYNTHESIZE: Blend new insights into the existing profile naturally. Do not just append a list of new facts. Group related facts together.
-4. PRUNE: If a new conversation directly contradicts an old insight (e.g. they changed their favorite color), remove the old one.
-5. FORMAT: Use clear section headers and bullet points. Write in the third person (e.g. "John prefers..." not "You prefer..."). Keep it concise.
+3. CAPTURE EVENTS & DATES: Actively look for dates, times, upcoming events, or past milestones (anniversaries, birthdays, appointments). Extract these explicitly so the AI remembers them for future conversations.
+4. SYNTHESIZE: Blend new insights into the existing profile naturally. Do not just append a list of new facts. Group related facts together.
+5. PRUNE: If a new conversation directly contradicts an old insight (e.g. they changed their favorite color), remove the old one.
+6. FORMAT: Use clear section headers and bullet points. Write in the third person (e.g. "${interlocutorName || 'User'} prefers..." not "You prefer..."). Keep it concise.
 
 Existing learned profile:
 ${existingLearned}

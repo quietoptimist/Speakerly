@@ -10,7 +10,7 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json()
-  const { messages, context_path, usage_event } = body
+  const { messages, context_path, usage_event, interlocutor_id } = body
 
   // If we're archiving a full conversation session
   if (messages && messages.length > 0) {
@@ -19,7 +19,8 @@ export async function POST(request: Request) {
       .insert({
         user_id: user.id,
         messages,
-        context_path: context_path || []
+        context_path: context_path || [],
+        interlocutor_id: interlocutor_id || null
       })
 
     if (error) {
@@ -38,7 +39,8 @@ export async function POST(request: Request) {
         context_path: usage_event.context_path || [],
         selected_topics: usage_event.selected_topics || [],
         phrase_spoken: usage_event.phrase_spoken,
-        phrase_type: usage_event.phrase_type || 'statement'
+        phrase_type: usage_event.phrase_type || 'statement',
+        interlocutor_id: usage_event.interlocutor_id || interlocutor_id || null
       })
 
     if (error) {

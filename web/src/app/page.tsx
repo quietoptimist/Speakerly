@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { Volume2, Loader2 } from "lucide-react";
 import { speakText } from "@/lib/speech";
 import { TopBar } from "@/components/layout/TopBar";
@@ -23,6 +24,7 @@ const responseSchema = z.object({
 });
 
 export default function Home() {
+  const router = useRouter();
   const [transcript, setTranscript] = useState("");
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [activeContextPath, setActiveContextPath] = useState<ContextNode[]>([]);
@@ -30,6 +32,22 @@ export default function Home() {
   const [isQuestion, setIsQuestion] = useState(false); // Question/Statement
   const [statementResponses, setStatementResponses] = useState<ResponseItem[]>([]);
   const [questionResponses, setQuestionResponses] = useState<ResponseItem[]>([]);
+
+  // Interlocutors State
+  const [interlocutors, setInterlocutors] = useState<any[]>([]);
+  const [selectedInterlocutorId, setSelectedInterlocutorId] = useState<string | null>(null);
+
+  // Fetch interlocutors on mount
+  useEffect(() => {
+    fetch('/api/interlocutors').then(r => r.json()).then(data => {
+      if (Array.isArray(data)) {
+        setInterlocutors(data);
+        if (data.length > 0) {
+            setSelectedInterlocutorId(data[0].id); // Select most recent by default
+        }
+      }
+    }).catch(console.error);
+  }, []);
 
   // Word Cloud States
   const [statementWords, setStatementWords] = useState<SuggestedWord[]>([]);
@@ -107,16 +125,18 @@ export default function Home() {
       body: JSON.stringify({
         messages: [{ role: role === 'partner' ? 'partner' : 'user', text: phrase }],
         context_path: contextPath,
+        interlocutor_id: selectedInterlocutorId,
         usage_event: {
           role,
           context_path: contextPath,
           selected_topics: selectedWords,
           phrase_spoken: phrase,
-          phrase_type: phraseType
+          phrase_type: phraseType,
+          interlocutor_id: selectedInterlocutorId
         }
       })
     }).catch(() => {}); // Non-blocking
-  }, [activeContextPath, selectedWords]);
+  }, [activeContextPath, selectedWords, selectedInterlocutorId]);
 
   // Speak text via browser TTS, add to chat, log, clear draft
   const speakReply = (text: string) => {
@@ -220,7 +240,8 @@ export default function Home() {
       context: activeContextPath.map(n => n.name),
       selectedWords: currentSelectedWords,
       requestedWordCount,
-      model: selectedModel
+      model: selectedModel,
+      interlocutor_id: selectedInterlocutorId
     });
   };
 
@@ -237,7 +258,8 @@ export default function Home() {
           context: activeContextPath.map(n => n.name),
           selectedWords: currentSelectedWords,
           requestedWordCount,
-          model: selectedModel
+          model: selectedModel,
+          interlocutor_id: selectedInterlocutorId
         }),
       });
       const data = await res.json();
@@ -284,13 +306,39 @@ export default function Home() {
       />
 
       <div className="flex-1 flex flex-col p-4 gap-4 overflow-hidden max-w-4xl mx-auto w-full">
-        {/* Tier 1.5: Context Hierarchy */}
-        <div className="shrink-0">
-          <ContextHierarchy 
-             activeContextPath={activeContextPath}
-             setActiveContextPath={setActiveContextPath}
-             onSuggestionsChange={setContextSuggestions}
-          />
+        {/* Tier 1.5: Context Hierarchy & Interlocutor */}
+        <div className="shrink-0 flex items-start gap-4">
+          <div className="flex-1">
+            <ContextHierarchy 
+               activeContextPath={activeContextPath}
+               setActiveContextPath={setActiveContextPath}
+               onSuggestionsChange={setContextSuggestions}
+            />
+          </div>
+          <div className="w-64 shrink-0">
+             <select 
+                value={selectedInterlocutorId || ''} 
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === 'ADD_NEW') {
+                    router.push('/profile/interlocutors');
+                  } else {
+                    setSelectedInterlocutorId(val || null);
+                  }
+                }}
+                className="w-full bg-slate-900 border border-slate-700 text-slate-200 text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
+             >
+                <option value="">Talking to: Anyone (Unspecified)</option>
+                <option value="ADD_NEW">+ Add New Person...</option>
+                <optgroup label="My People">
+                  {interlocutors.map(person => (
+                     <option key={person.id} value={person.id}>
+                        {person.name} {person.relationship ? `(${person.relationship})` : ''}
+                     </option>
+                  ))}
+                </optgroup>
+             </select>
+          </div>
         </div>
 
         {/* Tier 2: Transcript History */}
