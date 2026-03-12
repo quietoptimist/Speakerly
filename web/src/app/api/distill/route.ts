@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import OpenAI from 'openai'
-import { getDistillPrompt } from '@/lib/prompts'
+import { getUserDistillPrompt, getInterlocutorDistillPrompt } from '@/lib/prompts'
+
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
@@ -74,7 +75,9 @@ export async function POST(req: Request) {
   }).join('\n\n')
 
   // 4. Build the distillation prompt
-  const prompt = getDistillPrompt(existingLearned, formattedLogs, interlocutorName)
+  const prompt = interlocutorId && interlocutorName
+    ? getInterlocutorDistillPrompt(existingLearned, formattedLogs, interlocutorName)
+    : getUserDistillPrompt(existingLearned, formattedLogs)
 
   // 5. Call the LLM
   try {

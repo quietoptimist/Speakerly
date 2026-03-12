@@ -49,16 +49,36 @@ ${args.historyPrompt}
 Partner's latest: "${args.transcript}"`;
 };
 
-export const getDistillPrompt = (existingLearned: string, formattedLogs: string, interlocutorName?: string) => `You are analyzing conversation logs for an AAC (Augmentative and Alternative Communication) user.
-Given the following recent conversations and existing learned profile, extract NEW, HIGHLY SPECIFIC insights about the ${interlocutorName ? `interaction habits with ${interlocutorName}` : 'user'}.
+export const getUserDistillPrompt = (existingLearned: string, formattedLogs: string) => `You are analyzing conversation logs for an AAC (Augmentative and Alternative Communication) user.
+Given the following recent conversations and existing learned profile, extract NEW, HIGHLY SPECIFIC insights about the user.
 
 CRITICAL RULES FOR EXTRACTION:
-1. IGNORE THE OBVIOUS: Do NOT extract generic, mundane human behaviors. If the user is at a coffee shop ordering coffee, do not write "User frequently orders drinks at cafes." That is useless.
-2. EXTRACT THE SPECIFIC: Only extract unique, identifying preferences, names, relationships, or habits. (e.g., "User prefers their coffee with oat milk and no sugar," "User has a friend named Sarah," "User uses a wheelchair").
-3. CAPTURE EVENTS & DATES: Actively look for dates, times, upcoming events, or past milestones (anniversaries, birthdays, appointments). Extract these explicitly so the AI remembers them for future conversations.
-4. SYNTHESIZE: Blend new insights into the existing profile naturally. Do not just append a list of new facts. Group related facts together.
-5. PRUNE: If a new conversation directly contradicts an old insight (e.g. they changed their favorite color), remove the old one.
-6. FORMAT: Use clear section headers and bullet points. Write in the third person (e.g. "${interlocutorName || 'User'} prefers..." not "You prefer..."). Keep it concise.
+1. IGNORE THE OBVIOUS: Do NOT extract generic, mundane human behaviors.
+2. EXTRACT THE SPECIFIC: Only extract unique preferences, names, relationships, or habits.
+3. CAPTURE EVENTS & DATES: Actively look for dates, times, upcoming events, or past milestones.
+4. SYNTHESIZE: Blend new insights into the existing profile naturally.
+5. PRUNE: If a new conversation directly contradicts an old insight, remove the old one.
+6. FORMAT: Use clear section headers and bullet points. Write in the third person.
+
+Existing learned profile:
+${existingLearned}
+
+Recent conversations:
+${formattedLogs}
+
+Output ONLY the updated Markdown profile. Do not include any introductory or concluding remarks.`;
+
+export const getInterlocutorDistillPrompt = (existingLearned: string, formattedLogs: string, interlocutorName: string) => `You are analyzing conversation logs for an AAC (Augmentative and Alternative Communication) user's history with ${interlocutorName}.
+Given the following recent conversations and existing learned profile, extract NEW, HIGHLY SPECIFIC insights about the interaction habits with ${interlocutorName}.
+
+CRITICAL RULES FOR EXTRACTION:
+1. IGNORE THE OBVIOUS: Do NOT extract generic, mundane human behaviors.
+2. EXTRACT THE SPECIFIC: Only extract unique preferences, names, or habits of ${interlocutorName}.
+3. CAPTURE EVENTS & DATES: Actively look for dates, times, or upcoming events mentioned by ${interlocutorName}.
+4. SYNTHESIZE: Blend new insights into the existing profile naturally.
+5. RECENT HISTORY SUMMARY: ALWAYS add or update a brief section at the END of the profile called "## Recent History Summary". This should be a 2-3 sentence summary of the progress or outcomes of your most recent interactions. It should be written to help the AI suggest polite opening remarks or follow-up questions (e.g., "Ask how the doctor's appointment went," or "Follow up on the kitchen renovation mentioned last week").
+6. PRUNE: If a new conversation directly contradicts an old insight, remove the old one.
+7. FORMAT: Use clear section headers and bullet points. Write in the third person (e.g. "${interlocutorName} prefers..." not "You prefer...").
 
 Existing learned profile:
 ${existingLearned}
