@@ -223,7 +223,7 @@ export default function Home() {
   };
 
   const generatePredictions = async (currentTranscript: string, currentSelectedWords: string[]) => {
-    if (isManualMode && !currentTranscript && currentSelectedWords.length === 0 && activeContextPath.length === 0) return;
+    if (isManualMode && !currentTranscript && currentSelectedWords.length === 0 && activeContextPath.length === 0 && !selectedInterlocutorId) return;
 
     setIsLoading(true);
     setApiError(null);
@@ -284,9 +284,11 @@ export default function Home() {
         return Array.from(uniqueMap.values()).sort((a, b) => a.theme.localeCompare(b.theme));
       };
 
-      if (data.words) {
-        if (isQuestion) setQuestionWords(prev => mergeWords(prev, data.words));
-        else setStatementWords(prev => mergeWords(prev, data.words));
+      if (data.statementWords) {
+        setStatementWords(prev => mergeWords(prev, data.statementWords));
+      }
+      if (data.questionWords) {
+        setQuestionWords(prev => mergeWords(prev, data.questionWords));
       }
     } catch (error: any) {
       console.error("Failed to fetch fast words", error);
@@ -373,16 +375,15 @@ export default function Home() {
           </button>
         </div>
 
-        {/* Tier 4.5: Word Cloud */}
-        <div className="shrink-0 h-[15%] min-h-[110px] pt-2 border-t border-slate-800/50">
+        {/* Tier 4.5: Word Cloud (Split View) */}
+        <div className="shrink-0 h-[15%] min-h-[140px] pt-1 border-t border-slate-800/50">
           <WordCloud
-            words={isQuestion ? questionWords : statementWords}
+            statementWords={statementWords}
+            questionWords={questionWords}
             selectedWords={selectedWords}
             requestedCount={requestedWordCount}
             onCountChange={(delta) => setRequestedWordCount(Math.max(10, Math.min(40, requestedWordCount + delta)))}
             isLoading={isLoading}
-            isQuestion={isQuestion}
-            setIsQuestion={setIsQuestion}
             isManualMode={isManualMode}
             isWordsLoading={isWordsLoading}
             onUpdateWords={() => fetchFastWords(transcript, selectedWords)}
@@ -392,8 +393,12 @@ export default function Home() {
                 : [...selectedWords, word];
               setSelectedWords(newWords);
 
+              // Auto-toggle mode based on where the word came from
+              const isQ = questionWords.some(w => w.word === word);
+              if (isQ && !isQuestion) setIsQuestion(true);
+              if (!isQ && isQuestion && statementWords.some(w => w.word === word)) setIsQuestion(false);
+
               if (!isManualMode) {
-                // Instantly fetch new words when clicked in Auto Mode
                 fetchFastWords(transcript, newWords);
               }
             }}
@@ -401,7 +406,7 @@ export default function Home() {
         </div>
 
         {/* Tier 3: Quick Backchannels */}
-        <div className="shrink-0 pt-2 pb-2">
+        <div className="shrink-0 pt-0 pb-1">
           <QuickReplies
             dynamicReplies={dynamicQuickReplies}
             onReplySelect={(text) => {
@@ -414,17 +419,31 @@ export default function Home() {
         </div>
 
         {/* Tier 5: Long-Form Replies (2x2 Grid) */}
-        <div className="flex-1 overflow-hidden flex flex-col gap-2">
-          {isManualMode && (
-            <div className="flex justify-end pr-1">
+        <div className="flex-1 overflow-hidden flex flex-col gap-1">
+          <div className="flex justify-between items-center pr-1 mb-1">
+            <div className="flex bg-slate-900/60 rounded-full p-0.5 border border-slate-800 scale-90 origin-left">
+              <button
+                onClick={() => setIsQuestion(false)}
+                className={`text-[10px] font-bold rounded-full px-4 py-1 transition-colors ${!isQuestion ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'text-slate-500 hover:text-slate-300'}`}
+              >
+                Statements
+              </button>
+              <button
+                onClick={() => setIsQuestion(true)}
+                className={`text-[10px] font-bold rounded-full px-4 py-1 transition-colors ${isQuestion ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' : 'text-slate-500 hover:text-slate-300'}`}
+              >
+                Questions
+              </button>
+            </div>
+            {isManualMode && (
               <button
                 onClick={() => generatePredictions(transcript, selectedWords)}
-                className="text-sm font-semibold text-cyan-400 hover:text-cyan-300 flex items-center gap-1 bg-cyan-500/10 border border-cyan-500/30 px-4 py-1.5 rounded-full shadow-[0_0_10px_rgba(6,182,212,0.2)] hover:bg-cyan-500/20 hover:scale-105 active:scale-95 transition-all"
+                className="text-xs font-semibold text-cyan-400 hover:text-cyan-300 flex items-center gap-1 bg-cyan-500/10 border border-cyan-500/30 px-4 py-1.5 rounded-full shadow-[0_0_10px_rgba(6,182,212,0.1)] hover:bg-cyan-500/20 hover:scale-105 active:scale-95 transition-all h-7"
               >
                 Generate Now
               </button>
-            </div>
-          )}
+            )}
+          </div>
           <ResponseGrid
             responses={isQuestion ? questionResponses : statementResponses}
             isLoading={isLoading}

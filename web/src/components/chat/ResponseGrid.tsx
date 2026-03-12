@@ -56,12 +56,14 @@ export function ResponseGrid({ responses, isLoading, onResponseSelect, onRespons
 
             <div className="grid grid-cols-2 grid-rows-3 gap-4 h-full pb-4">
                 {responses.map((res, i) => {
-                    const resId = res.id ?? res.title ?? String(i);
+                    const resId = res.id ?? res.title ?? i;
+                    // Combine ID with index for absolute uniqueness in the DOM
+                    const uniqueKey = `res-${resId}-${i}`;
                     const isPlaying = playingId === resId;
 
                     return (
                         <Card
-                            key={resId}
+                            key={uniqueKey}
                             onClick={() => onResponseSelect?.(res)}
                             onDoubleClick={(e) => { e.preventDefault(); handleSpeak(res); }}
                             className={`bg-slate-900/40 cursor-pointer flex flex-col justify-center transition-all duration-200 ${isPlaying ? 'scale-95 ring-2 ring-white/50 bg-slate-800' : 'active:scale-95'

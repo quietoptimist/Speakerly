@@ -7,14 +7,13 @@ export interface SuggestedWord {
 }
 
 interface WordCloudProps {
-    words: SuggestedWord[];
+    statementWords: SuggestedWord[];
+    questionWords: SuggestedWord[];
     selectedWords: string[];
     onWordToggle: (word: string) => void;
     requestedCount: number;
     onCountChange: (delta: number) => void;
     isLoading: boolean;
-    isQuestion: boolean;
-    setIsQuestion: (val: boolean) => void;
     isManualMode?: boolean;
     onUpdateWords?: () => void;
     isWordsLoading?: boolean;
@@ -40,75 +39,28 @@ const getThemeColor = (theme?: string) => {
     return colors[Math.abs(hash) % colors.length];
 };
 
-export function WordCloud({ words, selectedWords, onWordToggle, requestedCount, onCountChange, isLoading, isQuestion, setIsQuestion, isManualMode, onUpdateWords, isWordsLoading }: WordCloudProps) {
-    return (
-        <div className="flex flex-col h-full bg-slate-900/50 rounded-lg border border-slate-800 p-3 relative overflow-hidden">
-            <div className="grid grid-cols-[1fr_auto_1fr] items-start mb-4 shrink-0 w-full">
-                <div className="flex flex-col justify-start pt-3 gap-2">
-                    <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Suggested Topics</h2>
-                    {isManualMode && onUpdateWords && (
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={onUpdateWords}
-                            disabled={isWordsLoading || isLoading}
-                            className="w-fit h-7 text-xs border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10 hover:text-cyan-300"
-                        >
-                            {isWordsLoading ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
-                            Refine
-                        </Button>
-                    )}
-                </div>
-
-                <div className="flex justify-center">
-                    <div className="flex bg-slate-900/80 rounded-full p-1 border border-slate-800 shadow-lg">
-                        <Button
-                            variant="ghost"
-                            onClick={() => setIsQuestion(false)}
-                            className={`h-12 text-lg font-semibold rounded-full px-8 transition-colors ${!isQuestion ? 'bg-cyan-500/20 text-cyan-400 shadow-md ring-1 ring-cyan-500/50' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'}`}
-                        >
-                            Statement
-                        </Button>
-                        <Button
-                            variant="ghost"
-                            onClick={() => setIsQuestion(true)}
-                            className={`h-12 text-lg font-semibold rounded-full px-8 transition-colors ${isQuestion ? 'bg-purple-500/20 text-purple-400 shadow-md ring-1 ring-purple-500/50' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'}`}
-                        >
-                            Question
-                        </Button>
-                    </div>
-                </div>
-
-                <div className="flex justify-end">
-                    <div className="flex flex-col items-center bg-slate-800 rounded-md overflow-hidden border border-slate-700">
-                        <button
-                            onClick={() => onCountChange(1)}
-                            disabled={requestedCount >= 40 || isLoading}
-                            className="px-2 py-1 hover:bg-slate-700 disabled:opacity-50 transition-colors"
-                        >
-                            <Plus className="h-3 w-3 text-slate-300" />
-                        </button>
-                        <div className="text-[10px] font-mono text-slate-400 border-y border-slate-700 w-full text-center py-0.5">
-                            {requestedCount}
-                        </div>
-                        <button
-                            onClick={() => onCountChange(-1)}
-                            disabled={requestedCount <= 10 || isLoading}
-                            className="px-2 py-1 hover:bg-slate-700 disabled:opacity-50 transition-colors"
-                        >
-                            <Minus className="h-3 w-3 text-slate-300" />
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <div className="flex-1 overflow-y-auto">
-                {(isLoading || isWordsLoading) && words.length === 0 ? (
-                    <div className="flex items-center justify-center h-full">
-                        <Loader2 className="h-5 w-5 text-cyan-500 animate-spin opacity-50" />
+export function WordCloud({ 
+    statementWords, 
+    questionWords, 
+    selectedWords, 
+    onWordToggle, 
+    requestedCount, 
+    onCountChange, 
+    isLoading, 
+    isManualMode, 
+    onUpdateWords, 
+    isWordsLoading 
+}: WordCloudProps) {
+    const WordList = ({ words, label, isLoading: listLoading }: { words: SuggestedWord[], label: string, isLoading: boolean }) => (
+        <div className="flex-1 flex flex-col min-w-0">
+            <h3 className="text-[10px] font-bold text-slate-600 uppercase tracking-tighter mb-2 pl-1 italic">{label}</h3>
+            <div className="flex-1 overflow-y-auto scrollbar-none">
+                {listLoading && words.length === 0 ? (
+                    <div className="flex items-center justify-center py-4">
+                        <Loader2 className="h-4 w-4 text-cyan-500 animate-spin opacity-50" />
                     </div>
                 ) : (
-                    <div className="flex flex-wrap gap-2 content-start min-h-full pb-2 transition-opacity">
+                    <div className="flex flex-wrap gap-1.5 content-start pb-2">
                         {words.map((w) => {
                             const isSelected = selectedWords.includes(w.word);
                             const themeColor = getThemeColor(w.theme);
@@ -117,8 +69,8 @@ export function WordCloud({ words, selectedWords, onWordToggle, requestedCount, 
                                 <button
                                     key={w.word}
                                     onClick={() => onWordToggle(w.word)}
-                                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200 border ${isSelected
-                                        ? "bg-cyan-600 text-white border-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.4)] scale-105"
+                                    className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all duration-200 border ${isSelected
+                                        ? "bg-cyan-600 text-white border-cyan-400 shadow-[0_0_8px_rgba(6,182,212,0.4)]"
                                         : `${themeColor} hover:brightness-125 hover:scale-105 active:scale-95`
                                         }`}
                                     title={`Theme: ${w.theme}`}
@@ -129,6 +81,54 @@ export function WordCloud({ words, selectedWords, onWordToggle, requestedCount, 
                         })}
                     </div>
                 )}
+            </div>
+        </div>
+    );
+
+    return (
+        <div className="flex flex-col h-full bg-slate-900/40 rounded-lg border border-slate-800/80 p-3 relative overflow-hidden">
+            <div className="flex justify-between items-start mb-2 shrink-0 w-full">
+                <div className="flex flex-col justify-start gap-1">
+                    <h2 className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Suggested Topics</h2>
+                    {isManualMode && onUpdateWords && (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={onUpdateWords}
+                            disabled={!!(isWordsLoading || isLoading)}
+                            className="w-fit h-6 text-[10px] border-cyan-500/20 text-cyan-500 hover:bg-cyan-500/10 hover:text-cyan-400"
+                        >
+                            {isWordsLoading ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                            Refine
+                        </Button>
+                    )}
+                </div>
+
+                <div className="flex flex-col items-center bg-slate-900/60 rounded-md overflow-hidden border border-slate-800">
+                    <button
+                        onClick={() => onCountChange(1)}
+                        disabled={requestedCount >= 40 || !!isLoading}
+                        className="px-1.5 py-0.5 hover:bg-slate-800 disabled:opacity-30 transition-colors"
+                    >
+                        <Plus className="h-2.5 w-2.5 text-slate-400" />
+                    </button>
+                    <div className="text-[8px] font-mono text-slate-500 border-y border-slate-800 w-full text-center py-0">
+                        {requestedCount}
+                    </div>
+                    <button
+                        onClick={() => onCountChange(-1)}
+                        disabled={requestedCount <= 10 || !!isLoading}
+                        className="px-1.5 py-0.5 hover:bg-slate-800 disabled:opacity-30 transition-colors"
+                    >
+                        <Minus className="h-2.5 w-2.5 text-slate-400" />
+                    </button>
+                </div>
+            </div>
+
+            <div className="flex-1 flex gap-4 overflow-hidden">
+                <WordList words={statementWords} label="Statements" isLoading={!!(isLoading || isWordsLoading)} />
+                <div className="w-[1px] bg-slate-800/50 self-stretch my-2 shrink-0" />
+                <WordList words={questionWords} label="Questions" isLoading={!!(isLoading || isWordsLoading)} />
             </div>
         </div>
     );

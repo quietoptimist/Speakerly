@@ -46,7 +46,7 @@ export function Transcript({ messages, onClear }: TranscriptProps) {
                         <div className="text-slate-600 italic text-sm text-center mt-4">No conversation history yet. Start talking!</div>
                     ) : (
                         messages.map((msg, i) => (
-                            <div key={i} className={`flex w-full ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                            <div key={`msg-${msg.role}-${i}`} className={`flex w-full ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
                                 <div className={`max-w-[80%] rounded-xl px-4 py-2 text-sm sm:text-base ${msg.role === "user"
                                     ? "bg-cyan-600/20 border border-cyan-500/30 text-cyan-50 rounded-br-sm"
                                     : "bg-slate-800 border border-slate-700 text-slate-200 rounded-bl-sm"

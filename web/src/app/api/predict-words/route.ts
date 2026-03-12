@@ -22,7 +22,7 @@ export async function POST(req: Request) {
             interlocutor_id = null
         } = body;
 
-        const coreInstructions = getWordCloudInstructions(requestedWordCount, isQuestion);
+        const coreInstructions = getWordCloudInstructions(requestedWordCount);
 
         const contextContext = context && context.length > 0 ? `Context: ${context.join(", ")}` : "No specific context.";
         const selectedWordsContext = selectedWords && selectedWords.length > 0
@@ -79,7 +79,7 @@ export async function POST(req: Request) {
 
         const fullPrompt = `${coreInstructions}\n${personaContext}\n--- CURRENT STATE ---\n${contextContext}\n${stateDesc}\n${selectedWordsContext}\n\nJSON OUTPUT:`;
 
-        let resultText = '{"words": []}';
+        let resultText = '{"statementWords": [], "questionWords": []}';
 
         if (model === "google") {
             const gResponse = await googleAi.models.generateContent({
