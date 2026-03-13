@@ -1,93 +1,77 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, Volume2 } from "lucide-react";
 import { useState } from "react";
 import { speakText, cancelSpeech } from "@/lib/speech";
 
 export interface ResponseItem {
     id?: number | string;
-    title: string;
     body: string;
-    color: string;
+    // legacy fields retained for context-suggestion compatibility
+    title?: string;
+    color?: string;
 }
 
 interface ResponseGridProps {
-    responses: ResponseItem[];
+    statementResponses: ResponseItem[];
+    questionResponses: ResponseItem[];
     isLoading: boolean;
     onResponseSelect?: (response: ResponseItem) => void;
     onResponseSpeak?: (response: ResponseItem) => void;
 }
 
-export function ResponseGrid({ responses, isLoading, onResponseSelect, onResponseSpeak }: ResponseGridProps) {
+export function ResponseGrid({ statementResponses, questionResponses, isLoading, onResponseSelect, onResponseSpeak }: ResponseGridProps) {
     const [playingId, setPlayingId] = useState<string | number | null>(null);
 
     const handleSpeak = (res: ResponseItem) => {
         cancelSpeech();
-        const resId = res.id ?? res.title;
+        const resId = res.id ?? res.body;
         setPlayingId(resId);
-
-        if (onResponseSpeak) {
-            onResponseSpeak(res);
-        }
-
-        speakText(
-            res.body,
-            undefined,
-            () => setPlayingId(null)
-        );
+        if (onResponseSpeak) onResponseSpeak(res);
+        speakText(res.body, undefined, () => setPlayingId(null));
     };
 
-    const getColorClasses = (color: string) => {
-        switch (color) {
-            case 'cyan': return 'border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10 shadow-[0_0_15px_rgba(6,182,212,0.15)]';
-            case 'purple': return 'border-purple-500/30 text-purple-400 hover:bg-purple-500/10 shadow-[0_0_15px_rgba(168,85,247,0.15)]';
-            case 'emerald': return 'border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 shadow-[0_0_15px_rgba(16,185,129,0.15)]';
-            default: return 'border-slate-500/30 text-slate-300 hover:bg-slate-800 shadow-md';
-        }
-    };
+    const renderColumn = (items: ResponseItem[], colKey: string) => (
+        <div className="flex-1 flex flex-col gap-2 overflow-y-auto scrollbar-none">
+            {items.map((res, i) => {
+                const resId = res.id ?? res.body ?? i;
+                const isPlaying = playingId === resId;
+                return (
+                    <button
+                        key={`${colKey}-${resId}-${i}`}
+                        onClick={() => onResponseSelect?.(res)}
+                        onDoubleClick={(e) => { e.preventDefault(); handleSpeak(res); }}
+                        className={`w-full text-left px-3 py-2 rounded-lg border text-sm leading-snug transition-all duration-150 active:scale-95
+                            ${isPlaying
+                                ? 'bg-slate-700 border-white/30 text-white ring-1 ring-white/30'
+                                : 'bg-slate-900/50 border-slate-700/50 text-slate-200 hover:bg-slate-800 hover:border-slate-600'
+                            }`}
+                    >
+                        <span className="flex items-center gap-2">
+                            {isPlaying && <Volume2 className="h-3 w-3 shrink-0 animate-pulse fill-white" />}
+                            {res.body}
+                        </span>
+                    </button>
+                );
+            })}
+            {items.length === 0 && !isLoading && (
+                <div className="flex-1 flex items-center justify-center text-slate-600 border border-dashed border-slate-800 rounded-lg text-xs">
+                    —
+                </div>
+            )}
+        </div>
+    );
 
     return (
-        <div className="h-full flex flex-col pt-2 relative">
-            <div className="flex justify-between items-center mb-3">
-                <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">AI Responses</h2>
-                {isLoading && (
-                    <Loader2 className="h-4 w-4 text-cyan-500 animate-spin opacity-70" />
-                )}
+        <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between mb-1.5">
+                <div className="flex-1 grid grid-cols-2 gap-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                    <span>Statements</span>
+                    <span>Questions</span>
+                </div>
+                {isLoading && <Loader2 className="h-3.5 w-3.5 text-cyan-500 animate-spin opacity-70 shrink-0" />}
             </div>
-
-            <div className="grid grid-cols-2 grid-rows-3 gap-4 h-full pb-4">
-                {responses.map((res, i) => {
-                    const resId = res.id ?? res.title ?? i;
-                    // Combine ID with index for absolute uniqueness in the DOM
-                    const uniqueKey = `res-${resId}-${i}`;
-                    const isPlaying = playingId === resId;
-
-                    return (
-                        <Card
-                            key={uniqueKey}
-                            onClick={() => onResponseSelect?.(res)}
-                            onDoubleClick={(e) => { e.preventDefault(); handleSpeak(res); }}
-                            className={`bg-slate-900/40 cursor-pointer flex flex-col justify-center transition-all duration-200 ${isPlaying ? 'scale-95 ring-2 ring-white/50 bg-slate-800' : 'active:scale-95'
-                                } ${getColorClasses(res.color)}`}
-                        >
-                            <CardHeader className="pb-2 text-center relative">
-                                {isPlaying && (
-                                    <div className="absolute top-2 right-2">
-                                        <Volume2 className="h-4 w-4 animate-pulse fill-white" />
-                                    </div>
-                                )}
-                                <CardTitle className="text-2xl font-bold tracking-tight">{res.title}</CardTitle>
-                            </CardHeader>
-                            <CardContent className="text-center">
-                                <p className="text-2xl tracking-normal opacity-90">{res.body}</p>
-                            </CardContent>
-                        </Card>
-                    );
-                })}
-                {responses.length === 0 && !isLoading && (
-                    <div className="col-span-2 row-span-2 flex items-center justify-center text-slate-600 border border-dashed border-slate-800 rounded-lg pb-6">
-                        <span className="opacity-70">Say something to see predictions...</span>
-                    </div>
-                )}
+            <div className="flex-1 grid grid-cols-2 gap-3 overflow-hidden">
+                {renderColumn(statementResponses, 'stmt')}
+                {renderColumn(questionResponses, 'qst')}
             </div>
         </div>
     );

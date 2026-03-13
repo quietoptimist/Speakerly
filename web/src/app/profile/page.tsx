@@ -10,7 +10,7 @@ Name:
 Age: 
 
 # People In My Life
-- FirstName LastName, brother
+- FirstName LastName, (brother)
 - FirstName, wife
 - FirstName LastName (sister)
 - FirstName, caregiver

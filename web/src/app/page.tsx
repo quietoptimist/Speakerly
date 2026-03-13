@@ -16,10 +16,10 @@ import { experimental_useObject as useObject } from '@ai-sdk/react';
 import { z } from 'zod';
 
 const responseSchema = z.object({
-  statementWords: z.array(z.object({ word: z.string(), theme: z.string() })).optional(),
-  questionWords: z.array(z.object({ word: z.string(), theme: z.string() })).optional(),
-  statementResponses: z.array(z.object({ id: z.number().optional(), title: z.string(), body: z.string(), color: z.string() })).optional(),
-  questionResponses: z.array(z.object({ id: z.number().optional(), title: z.string(), body: z.string(), color: z.string() })).optional(),
+  statementWords: z.array(z.object({ word: z.string() })).optional(),
+  questionWords: z.array(z.object({ word: z.string() })).optional(),
+  statementResponses: z.array(z.object({ id: z.number().optional(), body: z.string() })).optional(),
+  questionResponses: z.array(z.object({ id: z.number().optional(), body: z.string() })).optional(),
   quickReplies: z.array(z.string()).optional()
 });
 
@@ -54,7 +54,7 @@ export default function Home() {
   const [questionWords, setQuestionWords] = useState<SuggestedWord[]>([]);
   const [dynamicQuickReplies, setDynamicQuickReplies] = useState<string[]>([]);
   const [selectedWords, setSelectedWords] = useState<string[]>([]);
-  const [requestedWordCount, setRequestedWordCount] = useState(20);
+  const [requestedWordCount, setRequestedWordCount] = useState(10);
 
   const [isLoading, setIsLoading] = useState(false);
   const [isWordsLoading, setIsWordsLoading] = useState(false);
@@ -188,15 +188,10 @@ export default function Home() {
             relatedWords: [] 
         }));
         
-        const sentences = contextSuggestions.filter(s => s.type === 'sentence').map((s, i) => {
-            const isQ = s.text.endsWith("?");
-            return {
-                id: Date.now() + i,
-                title: s.text.length > 30 ? s.text.substring(0, 30) + "..." : s.text,
-                body: s.text,
-                color: (isQ ? "cyan" : "emerald") as any
-            };
-        });
+        const sentences = contextSuggestions.filter(s => s.type === 'sentence').map((s, i) => ({
+            id: Date.now() + i,
+            body: s.text,
+        }));
         
         const qResponses = sentences.filter(s => s.body.endsWith("?"));
         const sResponses = sentences.filter(s => !s.body.endsWith("?"));
@@ -281,7 +276,7 @@ export default function Home() {
           }
         });
 
-        return Array.from(uniqueMap.values()).sort((a, b) => a.theme.localeCompare(b.theme));
+        return Array.from(uniqueMap.values());
       };
 
       if (data.statementWords) {
@@ -307,43 +302,34 @@ export default function Home() {
         selectedModel={selectedModel} setSelectedModel={setSelectedModel}
       />
 
-      <div className="flex-1 flex flex-col p-4 gap-4 overflow-hidden max-w-4xl mx-auto w-full">
-        {/* Tier 1.5: Context Hierarchy & Interlocutor */}
-        <div className="shrink-0 flex items-start gap-4">
-          <div className="flex-1">
-            <ContextHierarchy 
-               activeContextPath={activeContextPath}
-               setActiveContextPath={setActiveContextPath}
-               onSuggestionsChange={setContextSuggestions}
-            />
-          </div>
-          <div className="w-64 shrink-0">
-             <select 
-                value={selectedInterlocutorId || ''} 
-                onChange={(e) => {
-                  const val = e.target.value;
-                  if (val === 'ADD_NEW') {
-                    router.push('/profile/interlocutors');
-                  } else {
-                    setSelectedInterlocutorId(val || null);
-                  }
-                }}
-                className="w-full bg-slate-900 border border-slate-700 text-slate-200 text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
-             >
-                <option value="">Talking to: Anyone (Unspecified)</option>
-                <option value="ADD_NEW">+ Add New Person...</option>
-                <optgroup label="My People">
-                  {interlocutors.map(person => (
-                     <option key={person.id} value={person.id}>
-                        {person.name} {person.relationship ? `(${person.relationship})` : ''}
-                     </option>
-                  ))}
-                </optgroup>
-             </select>
-          </div>
+      <div className="flex-1 flex flex-col p-4 gap-3 overflow-hidden max-w-4xl mx-auto w-full">
+        {/* Interlocutor selector */}
+        <div className="shrink-0">
+          <select
+            value={selectedInterlocutorId || ''}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (val === 'ADD_NEW') {
+                router.push('/profile/interlocutors');
+              } else {
+                setSelectedInterlocutorId(val || null);
+              }
+            }}
+            className="w-full bg-slate-900 border border-slate-700 text-slate-200 text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
+          >
+            <option value="">Talking to: Anyone (Unspecified)</option>
+            <option value="ADD_NEW">+ Add New Person...</option>
+            <optgroup label="My People">
+              {interlocutors.map(person => (
+                <option key={person.id} value={person.id}>
+                  {person.name} {person.relationship ? `(${person.relationship})` : ''}
+                </option>
+              ))}
+            </optgroup>
+          </select>
         </div>
 
-        {/* Tier 2: Transcript History */}
+        {/* Transcript History */}
         <div className="shrink-0 h-[12%] min-h-[90px]">
           <Transcript
             messages={chatHistory}
@@ -375,8 +361,17 @@ export default function Home() {
           </button>
         </div>
 
-        {/* Tier 4.5: Word Cloud (Split View) */}
-        <div className="shrink-0 h-[15%] min-h-[140px] pt-1 border-t border-slate-800/50">
+        {/* Situational Context */}
+        <div className="shrink-0 border-t border-slate-800/50 pt-3">
+          <ContextHierarchy
+            activeContextPath={activeContextPath}
+            setActiveContextPath={setActiveContextPath}
+            onSuggestionsChange={setContextSuggestions}
+          />
+        </div>
+
+        {/* Word Cloud (Split View) */}
+        <div className="shrink-0 h-[15%] min-h-[190px] pt-1 border-t border-slate-800/50">
           <WordCloud
             statementWords={statementWords}
             questionWords={questionWords}
@@ -393,7 +388,6 @@ export default function Home() {
                 : [...selectedWords, word];
               setSelectedWords(newWords);
 
-              // Auto-toggle mode based on where the word came from
               const isQ = questionWords.some(w => w.word === word);
               if (isQ && !isQuestion) setIsQuestion(true);
               if (!isQ && isQuestion && statementWords.some(w => w.word === word)) setIsQuestion(false);
@@ -405,8 +399,8 @@ export default function Home() {
           />
         </div>
 
-        {/* Tier 3: Quick Backchannels */}
-        <div className="shrink-0 pt-0 pb-1">
+        {/* Quick Backchannels */}
+        <div className="shrink-0 pb-1">
           <QuickReplies
             dynamicReplies={dynamicQuickReplies}
             onReplySelect={(text) => {
@@ -418,34 +412,21 @@ export default function Home() {
           />
         </div>
 
-        {/* Tier 5: Long-Form Replies (2x2 Grid) */}
+        {/* AI Responses — two-column (statements | questions) */}
         <div className="flex-1 overflow-hidden flex flex-col gap-1">
-          <div className="flex justify-between items-center pr-1 mb-1">
-            <div className="flex bg-slate-900/60 rounded-full p-0.5 border border-slate-800 scale-90 origin-left">
-              <button
-                onClick={() => setIsQuestion(false)}
-                className={`text-[10px] font-bold rounded-full px-4 py-1 transition-colors ${!isQuestion ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'text-slate-500 hover:text-slate-300'}`}
-              >
-                Statements
-              </button>
-              <button
-                onClick={() => setIsQuestion(true)}
-                className={`text-[10px] font-bold rounded-full px-4 py-1 transition-colors ${isQuestion ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' : 'text-slate-500 hover:text-slate-300'}`}
-              >
-                Questions
-              </button>
-            </div>
-            {isManualMode && (
+          {isManualMode && (
+            <div className="flex justify-end pr-1 mb-1">
               <button
                 onClick={() => generatePredictions(transcript, selectedWords)}
                 className="text-xs font-semibold text-cyan-400 hover:text-cyan-300 flex items-center gap-1 bg-cyan-500/10 border border-cyan-500/30 px-4 py-1.5 rounded-full shadow-[0_0_10px_rgba(6,182,212,0.1)] hover:bg-cyan-500/20 hover:scale-105 active:scale-95 transition-all h-7"
               >
                 Generate Now
               </button>
-            )}
-          </div>
+            </div>
+          )}
           <ResponseGrid
-            responses={isQuestion ? questionResponses : statementResponses}
+            statementResponses={statementResponses}
+            questionResponses={questionResponses}
             isLoading={isLoading}
             onResponseSelect={(response) => {
               setReplyDraft(prev => prev ? `${prev} ${response.body}` : response.body);

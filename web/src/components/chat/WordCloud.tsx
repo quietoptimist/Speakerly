@@ -3,7 +3,7 @@ import { Plus, Minus, Loader2 } from "lucide-react";
 
 export interface SuggestedWord {
     word: string;
-    theme: string;
+    theme?: string;
 }
 
 interface WordCloudProps {
@@ -19,25 +19,7 @@ interface WordCloudProps {
     isWordsLoading?: boolean;
 }
 
-// Generate consistent colors based on theme string
-const getThemeColor = (theme?: string) => {
-    let hash = 0;
-    const safeTheme = theme || "general";
-    for (let i = 0; i < safeTheme.length; i++) {
-        hash = safeTheme.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    const colors = [
-        "bg-blue-500/20 text-blue-300 border-blue-500/30",
-        "bg-green-500/20 text-green-300 border-green-500/30",
-        "bg-yellow-500/20 text-yellow-300 border-yellow-500/30",
-        "bg-pink-500/20 text-pink-300 border-pink-500/30",
-        "bg-orange-500/20 text-orange-300 border-orange-500/30",
-        "bg-teal-500/20 text-teal-300 border-teal-500/30",
-        "bg-indigo-500/20 text-indigo-300 border-indigo-500/30",
-        "bg-rose-500/20 text-rose-300 border-rose-500/30",
-    ];
-    return colors[Math.abs(hash) % colors.length];
-};
+const unselectedWordClass = "bg-slate-800/60 text-slate-300 border-slate-700/50";
 
 export function WordCloud({ 
     statementWords, 
@@ -63,17 +45,14 @@ export function WordCloud({
                     <div className="flex flex-wrap gap-1.5 content-start pb-2">
                         {words.map((w) => {
                             const isSelected = selectedWords.includes(w.word);
-                            const themeColor = getThemeColor(w.theme);
-
                             return (
                                 <button
                                     key={w.word}
                                     onClick={() => onWordToggle(w.word)}
                                     className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all duration-200 border ${isSelected
                                         ? "bg-cyan-600 text-white border-cyan-400 shadow-[0_0_8px_rgba(6,182,212,0.4)]"
-                                        : `${themeColor} hover:brightness-125 hover:scale-105 active:scale-95`
+                                        : `${unselectedWordClass} hover:brightness-125 hover:scale-105 active:scale-95`
                                         }`}
-                                    title={`Theme: ${w.theme}`}
                                 >
                                     {w.word}
                                 </button>

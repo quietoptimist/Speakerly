@@ -5,10 +5,10 @@ CRITICAL RULES:
 1. SYNTHESIS: If the user has selected words, you MUST synthesize the CONCEPTS of ALL those words into EVERY sentence option. Sentences should be natural and short, ideally under 10 words.
 2. FORMAT: Output MUST be valid JSON with this exact schema:
 {
-  "statementWords": [{ "word": "string", "theme": "string" }],
-  "questionWords": [{ "word": "string", "theme": "string" }],
-  "statementResponses": [{ "id": number, "title": "short summary", "body": "full sentence", "color": "cyan|emerald|purple|slate" }],
-  "questionResponses": [{ "id": number, "title": "short summary", "body": "full sentence", "color": "cyan|emerald|purple|slate" }],
+  "statementWords": [{ "word": "string" }],
+  "questionWords": [{ "word": "string" }],
+  "statementResponses": [{ "id": number, "body": "full sentence" }],
+  "questionResponses": [{ "id": number, "body": "full sentence" }],
   "quickReplies": ["1-2 word string", "another string"]
 }
 3. HYPER-RELEVANCE: This is the MOST IMPORTANT rule. You must tightly restrict all generated words and sentences to the CURRENT STATE.
@@ -28,8 +28,8 @@ You must generate approximately ${requestedWordCount} individual vocabulary word
 CRITICAL RULES:
 1. FORMAT: Output MUST be valid JSON with this exact schema:
 {
-  "statementWords": [{ "word": "string", "theme": "string" }],
-  "questionWords": [{ "word": "string", "theme": "string" }]
+  "statementWords": [{ "word": "string" }],
+  "questionWords": [{ "word": "string" }]
 }
 2. VOCABULARY: Generate exactly ${requestedWordCount} words for \`statementWords\` (focusing on nouns, verbs, and adjectives relevant to the topic). Generate exactly ${requestedWordCount} words for \`questionWords\` (focusing on question-starters and query topics).
 3. RELEVANCE: Create words heavily derived from the provided context, history, and selected words. 
