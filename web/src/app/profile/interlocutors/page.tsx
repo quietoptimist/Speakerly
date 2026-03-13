@@ -5,6 +5,25 @@ import { Button } from '@/components/ui/button'
 import { ArrowLeft, Save, Loader2, RefreshCw, User, Brain, Plus } from 'lucide-react'
 import Link from 'next/link'
 
+const DEFAULT_INTERLOCUTOR_PROFILE = `# About Them
+Age:
+Occupation:
+
+# Their Interests
+(hobbies, favourite topics, things they enjoy talking about)
+
+# How To Talk To Them
+(how they like to be addressed, level of formality, tone that works well, any humour or language they appreciate)
+
+# Things To Ask About
+(ongoing projects, events, life situations worth following up on)
+
+# Topics To Avoid
+(sensitive subjects, things they prefer not to discuss)
+
+# Useful Facts
+(anything specific worth remembering — e.g. dietary needs, mobility, preferences)`
+
 interface Interlocutor {
     id: string;
     name: string;
@@ -78,7 +97,7 @@ export default function InterlocutorsPage() {
             setEditingId('new')
             setDraftName('')
             setDraftRel('')
-            setDraftProfile('')
+            setDraftProfile(DEFAULT_INTERLOCUTOR_PROFILE)
             setDraftLearned('')
         }
         setIsLearnedUnlocked(false)
