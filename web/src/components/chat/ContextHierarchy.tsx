@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from "react"
-import { ChevronRight, Loader2, Save, X, Edit, Plus, RefreshCw } from "lucide-react"
+import { ChevronRight, Loader2, X, Edit, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
@@ -226,13 +226,9 @@ export function ContextHierarchy({ activeContextPath, setActiveContextPath, onSu
         <div className="bg-slate-900/50 rounded-xl border border-slate-800 p-2.5 space-y-2">
             <div className="flex justify-between items-center pb-1.5 border-b border-slate-800/50">
                 <h3 className="text-xs font-semibold text-slate-300">Situational Context</h3>
-                {isDefaultView ? (
+                {isDefaultView && (
                     <Button variant="outline" size="sm" onClick={copyDefaults} disabled={isSaving} className="h-7 text-xs border-cyan-800/50 hover:bg-cyan-900/20 text-cyan-400">
-                        <Edit className="h-3 w-3 mr-1" /> Override Defaults
-                    </Button>
-                ) : (
-                    <Button variant="ghost" size="sm" onClick={copyDefaults} disabled={isSaving} className="h-7 text-xs text-slate-500 hover:text-red-400">
-                        <RefreshCw className="h-3 w-3 mr-1" /> Reset to Defaults
+                        <Edit className="h-3 w-3 mr-1" /> Customise
                     </Button>
                 )}
             </div>

@@ -11,10 +11,10 @@ import { STOP_WORDS } from "@/lib/stopWords";
 export const maxDuration = 60; 
 
 const responseSchema = z.object({
-  statementWords: z.array(z.object({ word: z.string(), theme: z.string() })).optional(),
-  questionWords: z.array(z.object({ word: z.string(), theme: z.string() })).optional(),
-  statementResponses: z.array(z.object({ id: z.number().optional(), title: z.string(), body: z.string(), color: z.string() })).optional(),
-  questionResponses: z.array(z.object({ id: z.number().optional(), title: z.string(), body: z.string(), color: z.string() })).optional(),
+  statementWords: z.array(z.object({ word: z.string() })).optional(),
+  questionWords: z.array(z.object({ word: z.string() })).optional(),
+  statementResponses: z.array(z.object({ id: z.number().optional(), body: z.string() })).optional(),
+  questionResponses: z.array(z.object({ id: z.number().optional(), body: z.string() })).optional(),
   quickReplies: z.array(z.string()).optional()
 });
 
@@ -191,7 +191,7 @@ ${selectedWordsContext}`;
       aiModel = google("gemini-2.5-flash");
     } else if (model === "anthropic") {
       // Fallback to latest haiku if custom string fails, but trying user's string first
-      aiModel = anthropic("claude-3-5-haiku-latest"); // standard naming
+      aiModel = anthropic("claude-haiku-4-5-20251001");
     } else {
       aiModel = openai("gpt-4o-mini"); // gpt-5-mini doesn't exist natively in the SDK mapping yet, defaulting to 4o-mini for safety
     }

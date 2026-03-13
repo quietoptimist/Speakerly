@@ -4,17 +4,21 @@
 // Bypasses the highly unreliable local browser Web Speech API in favor of a fast-streaming OpenAI proxy.
 
 let currentAudio: HTMLAudioElement | null = null;
+let currentObjectUrl: string | null = null;
 
 export function cancelSpeech() {
   if (currentAudio) {
     currentAudio.pause();
-    currentAudio.currentTime = 0;
-    currentAudio.src = ''; // Force unload
+    currentAudio.src = '';
     currentAudio = null;
+  }
+  if (currentObjectUrl) {
+    URL.revokeObjectURL(currentObjectUrl);
+    currentObjectUrl = null;
   }
 }
 
-export function speakText(text: string, onStart?: () => void, onEnd?: () => void) {
+export async function speakText(text: string, onStart?: () => void, onEnd?: () => void) {
   if (!text) {
     onStart?.();
     onEnd?.();
@@ -24,9 +28,22 @@ export function speakText(text: string, onStart?: () => void, onEnd?: () => void
   cancelSpeech();
 
   try {
-    const url = `/api/speak?text=${encodeURIComponent(text)}`;
-    // Keep a local ref so event handlers still see the element after currentAudio is nulled by cancelSpeech()
-    const audio = new Audio(url);
+    // POST to avoid URL length limits that truncate long sentences
+    const response = await fetch('/api/speak', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Speak API error: ${response.status}`);
+    }
+
+    const audioBlob = await response.blob();
+    const objectUrl = URL.createObjectURL(audioBlob);
+    currentObjectUrl = objectUrl;
+
+    const audio = new Audio(objectUrl);
     currentAudio = audio;
 
     audio.onplay = () => {
@@ -35,7 +52,9 @@ export function speakText(text: string, onStart?: () => void, onEnd?: () => void
 
     audio.onended = () => {
       if (onEnd) onEnd();
+      URL.revokeObjectURL(objectUrl);
       currentAudio = null;
+      currentObjectUrl = null;
     };
 
     audio.onerror = () => {

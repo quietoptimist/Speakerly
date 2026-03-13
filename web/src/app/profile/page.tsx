@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
-import { ArrowLeft, Save, Loader2, Brain, User, RefreshCw, Plus, ChevronDown, ChevronUp } from 'lucide-react'
+import { ArrowLeft, Save, Loader2, Brain, User, RefreshCw, Plus, Trash2, ChevronDown, ChevronUp, Settings } from 'lucide-react'
 import Link from 'next/link'
 import { logout } from '@/app/login/actions'
 
@@ -66,6 +66,31 @@ interface Interlocutor {
 }
 
 export default function ProfilesPage() {
+    // Settings state
+    const [wordCount, setWordCount] = useState<number>(() => {
+        if (typeof window === 'undefined') return 10
+        return parseInt(localStorage.getItem('speakerly_word_count') || '10', 10)
+    })
+    const [isResettingContext, setIsResettingContext] = useState(false)
+
+    const handleWordCountChange = (value: number) => {
+        setWordCount(value)
+        localStorage.setItem('speakerly_word_count', String(value))
+    }
+
+    const handleResetContext = async () => {
+        setIsResettingContext(true)
+        try {
+            const res = await fetch('/api/contexts', { method: 'POST' })
+            if (res.ok) showStatus('Context reset to defaults')
+            else showStatus('Reset failed')
+        } catch {
+            showStatus('Reset failed')
+        } finally {
+            setIsResettingContext(false)
+        }
+    }
+
     // About Me state
     const [isAboutMeExpanded, setIsAboutMeExpanded] = useState(false)
     const [profileMd, setProfileMd] = useState('')
@@ -78,8 +103,9 @@ export default function ProfilesPage() {
     // Interlocutors state
     const [interlocutors, setInterlocutors] = useState<Interlocutor[]>([])
     const [isInterlocutorsLoading, setIsInterlocutorsLoading] = useState(true)
-    const [isSyncing, setIsSyncing] = useState(false)
     const [editingId, setEditingId] = useState<string | null>(null)
+    const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+    const [isDeleting, setIsDeleting] = useState(false)
     const [draftName, setDraftName] = useState('')
     const [draftRel, setDraftRel] = useState('')
     const [draftProfile, setDraftProfile] = useState('')
@@ -166,21 +192,22 @@ export default function ProfilesPage() {
         }
     }
 
-    const handleSync = async () => {
-        setIsSyncing(true)
+    const handleDeletePerson = async (id: string) => {
+        setIsDeleting(true)
         try {
-            const res = await fetch('/api/interlocutors/sync', { method: 'POST' })
-            const data = await res.json()
+            const res = await fetch(`/api/interlocutors?id=${id}`, { method: 'DELETE' })
             if (res.ok) {
-                showStatus(`Imported ${data.count} new ${data.count === 1 ? 'person' : 'people'}!`)
-                if (data.count > 0) fetchInterlocutors()
+                showStatus('Deleted')
+                setEditingId(null)
+                setConfirmDeleteId(null)
+                fetchInterlocutors()
             } else {
-                showStatus('Import failed')
+                showStatus('Failed to delete')
             }
         } catch {
-            showStatus('Import failed')
+            showStatus('Failed to delete')
         } finally {
-            setIsSyncing(false)
+            setIsDeleting(false)
         }
     }
 
@@ -278,6 +305,51 @@ export default function ProfilesPage() {
 
             <div className="max-w-3xl mx-auto p-6 space-y-0">
 
+                {/* ── Settings ─────────────────────────────── */}
+                <section className="py-4 space-y-4">
+                    <div className="flex items-center gap-2">
+                        <Settings className="h-4 w-4 text-slate-400" />
+                        <h2 className="text-sm font-semibold text-slate-200">Settings</h2>
+                    </div>
+
+                    {/* Word count */}
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="text-sm text-slate-300">Suggested Topics Word Count</p>
+                            <p className="text-xs text-slate-500 mt-0.5">Number of words shown in the Statements and Questions columns.</p>
+                        </div>
+                        <select
+                            value={wordCount}
+                            onChange={e => handleWordCountChange(Number(e.target.value))}
+                            className="ml-4 bg-slate-900 border border-slate-700 text-slate-200 text-sm rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
+                        >
+                            {[5, 10, 15, 20].map(n => (
+                                <option key={n} value={n}>{n} words</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {/* Reset context */}
+                    <div className="flex items-start justify-between pt-1">
+                        <div>
+                            <p className="text-sm text-slate-300">Reset Situational Context</p>
+                            <p className="text-xs text-slate-500 mt-0.5 max-w-xs">Removes all customised context options and restores the default set.</p>
+                        </div>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleResetContext}
+                            disabled={isResettingContext}
+                            className="ml-4 shrink-0 border-slate-700 text-slate-400 hover:text-red-400 hover:border-red-800/50 rounded-full text-xs h-8"
+                        >
+                            {isResettingContext ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <RefreshCw className="h-3 w-3 mr-1" />}
+                            Reset to Defaults
+                        </Button>
+                    </div>
+                </section>
+
+                <div className="border-t border-slate-800" />
+
                 {/* ── About Me ─────────────────────────────── */}
                 <section>
                     {/* Collapsed header — always visible */}
@@ -372,20 +444,12 @@ export default function ProfilesPage() {
                                 Add profiles for the people you talk to regularly. The AI uses these to tailor suggestions for each conversation.
                             </p>
                         </div>
-                        <div className="flex items-center gap-2 shrink-0 ml-4">
-                            <Button onClick={handleSync} disabled={isSyncing || editingId !== null}
-                                variant="outline" size="sm"
-                                className="border-slate-700 text-slate-400 hover:text-white rounded-full text-xs h-8">
-                                {isSyncing ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <RefreshCw className="h-3 w-3 mr-1" />}
-                                Import from Profile
-                            </Button>
-                            <Button onClick={() => startEditing()} disabled={editingId !== null}
-                                size="sm"
-                                className="bg-cyan-600 hover:bg-cyan-500 text-white rounded-full text-xs h-8">
-                                <Plus className="h-3 w-3 mr-1" />
-                                Add Person
-                            </Button>
-                        </div>
+                        <Button onClick={() => startEditing()} disabled={editingId !== null}
+                            size="sm"
+                            className="bg-cyan-600 hover:bg-cyan-500 text-white rounded-full text-xs h-8 shrink-0 ml-4">
+                            <Plus className="h-3 w-3 mr-1" />
+                            Add Person
+                        </Button>
                     </div>
 
                     {/* Edit form */}
@@ -395,8 +459,28 @@ export default function ProfilesPage() {
                                 <h3 className="text-sm font-semibold text-slate-200">
                                     {editingId === 'new' ? 'Add New Person' : 'Edit Person'}
                                 </h3>
-                                <div className="flex gap-2">
-                                    <Button variant="ghost" size="sm" onClick={() => setEditingId(null)}
+                                <div className="flex gap-2 items-center">
+                                    {editingId !== 'new' && (
+                                        confirmDeleteId === editingId ? (
+                                            <div className="flex items-center gap-2 bg-red-950/50 border border-red-800/50 rounded-full px-3 py-1">
+                                                <span className="text-xs text-red-300">Delete this person?</span>
+                                                <button onClick={() => handleDeletePerson(editingId!)} disabled={isDeleting}
+                                                    className="text-xs font-semibold text-red-400 hover:text-red-300">
+                                                    {isDeleting ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Yes, delete'}
+                                                </button>
+                                                <button onClick={() => setConfirmDeleteId(null)} className="text-xs text-slate-500 hover:text-slate-300">
+                                                    Cancel
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <Button variant="ghost" size="sm" onClick={() => setConfirmDeleteId(editingId)}
+                                                className="text-slate-600 hover:text-red-400 hover:bg-red-950/30 rounded-full text-xs h-8">
+                                                <Trash2 className="h-3 w-3 mr-1" />
+                                                Delete
+                                            </Button>
+                                        )
+                                    )}
+                                    <Button variant="ghost" size="sm" onClick={() => { setEditingId(null); setConfirmDeleteId(null); }}
                                         className="text-slate-400 hover:text-white rounded-full text-xs h-8">
                                         Cancel
                                     </Button>
@@ -474,7 +558,7 @@ export default function ProfilesPage() {
                                 <User className="h-10 w-10 text-slate-700 mx-auto mb-3" />
                                 <p className="text-sm text-slate-400 mb-1">No people added yet</p>
                                 <p className="text-xs text-slate-600 max-w-xs mx-auto">
-                                    Add the people you talk to most so the AI can tailor suggestions to each conversation.
+                                    Click "Add Person" to create a profile for someone you talk to regularly.
                                 </p>
                             </div>
                         ) : (

@@ -1,4 +1,3 @@
-
 import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Mic, Square, Loader2 } from 'lucide-react';
@@ -10,8 +9,13 @@ interface AudioRecorderProps {
 export function AudioRecorder({ onTranscription }: AudioRecorderProps) {
     const [isRecording, setIsRecording] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
-    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-    const chunksRef = useRef<Blob[]>([]);
+
+    const audioContextRef = useRef<AudioContext | null>(null);
+    const processorRef = useRef<ScriptProcessorNode | null>(null);
+    const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+    const streamRef = useRef<MediaStream | null>(null);
+    const samplesRef = useRef<Float32Array[]>([]);
+    const sampleRateRef = useRef<number>(44100);
 
     const startRecording = async () => {
         try {
@@ -19,26 +23,35 @@ export function AudioRecorder({ onTranscription }: AudioRecorderProps) {
                 alert("Microphone access is not available. Make sure the page is served over HTTPS or localhost.");
                 return;
             }
+
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            streamRef.current = stream;
 
-            // Safari supports audio/mp4; other browsers prefer audio/webm
-            const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4';
-            mediaRecorderRef.current = new MediaRecorder(stream, { mimeType });
-            chunksRef.current = [];
+            // Use ScriptProcessorNode to capture raw PCM samples directly.
+            // This completely bypasses MediaRecorder and its mp4 fragmentation behaviour in Safari,
+            // where each speech burst (separated by a pause) is emitted as an independent mp4 file
+            // — making clean concatenation impossible. Raw PCM has no such issue.
+            const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+            audioContextRef.current = audioContext;
+            sampleRateRef.current = audioContext.sampleRate;
 
-            mediaRecorderRef.current.ondataavailable = (e) => {
-                if (e.data.size > 0) {
-                    chunksRef.current.push(e.data);
-                }
+            const source = audioContext.createMediaStreamSource(stream);
+            sourceRef.current = source;
+
+            const processor = audioContext.createScriptProcessor(4096, 1, 1);
+            processorRef.current = processor;
+            samplesRef.current = [];
+
+            processor.onaudioprocess = (e) => {
+                // Capture a copy of the mono input channel
+                const input = e.inputBuffer.getChannelData(0);
+                samplesRef.current.push(new Float32Array(input));
             };
 
-            mediaRecorderRef.current.onstop = async () => {
-                const audioBlob = new Blob(chunksRef.current, { type: mimeType });
-                await processAudio(audioBlob);
-                stream.getTracks().forEach(track => track.stop());
-            };
+            source.connect(processor);
+            // Connect to destination to keep the audio graph running (required in some browsers)
+            processor.connect(audioContext.destination);
 
-            mediaRecorderRef.current.start();
             setIsRecording(true);
         } catch (err) {
             console.error("Error accessing microphone:", err);
@@ -47,32 +60,79 @@ export function AudioRecorder({ onTranscription }: AudioRecorderProps) {
     };
 
     const stopRecording = () => {
-        if (mediaRecorderRef.current && isRecording) {
-            mediaRecorderRef.current.stop();
-            setIsRecording(false);
+        if (!isRecording) return;
+
+        sourceRef.current?.disconnect();
+        processorRef.current?.disconnect();
+        audioContextRef.current?.close();
+        streamRef.current?.getTracks().forEach(t => t.stop());
+
+        setIsRecording(false);
+
+        const samples = samplesRef.current;
+        if (samples.length > 0) {
+            processAudio(encodeWav(samples, sampleRateRef.current));
         }
     };
 
-    const processAudio = async (blob: Blob) => {
+    // Encode captured PCM chunks directly to a 16-bit mono WAV blob
+    const encodeWav = (chunks: Float32Array[], sampleRate: number): Blob => {
+        const totalSamples = chunks.reduce((n, c) => n + c.length, 0);
+        const buf = new ArrayBuffer(44 + totalSamples * 2);
+        const view = new DataView(buf);
+
+        const str = (offset: number, s: string) => {
+            for (let i = 0; i < s.length; i++) view.setUint8(offset + i, s.charCodeAt(i));
+        };
+
+        str(0, 'RIFF');
+        view.setUint32(4, 36 + totalSamples * 2, true);
+        str(8, 'WAVE');
+        str(12, 'fmt ');
+        view.setUint32(16, 16, true);           // chunk size
+        view.setUint16(20, 1, true);            // PCM
+        view.setUint16(22, 1, true);            // mono
+        view.setUint32(24, sampleRate, true);
+        view.setUint32(28, sampleRate * 2, true); // byte rate
+        view.setUint16(32, 2, true);            // block align
+        view.setUint16(34, 16, true);           // bits per sample
+        str(36, 'data');
+        view.setUint32(40, totalSamples * 2, true);
+
+        let offset = 44;
+        for (const chunk of chunks) {
+            for (let i = 0; i < chunk.length; i++) {
+                const s = Math.max(-1, Math.min(1, chunk[i]));
+                view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+                offset += 2;
+            }
+        }
+
+        return new Blob([buf], { type: 'audio/wav' });
+    };
+
+    const processAudio = async (wavBlob: Blob) => {
         setIsProcessing(true);
         try {
-            const ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
             const formData = new FormData();
-            formData.append('file', blob, `recording.${ext}`);
+            formData.append('file', wavBlob, 'recording.wav');
 
             const response = await fetch('/api/transcribe', {
                 method: 'POST',
                 body: formData,
             });
 
-            if (!response.ok) throw new Error('Transcription failed');
+            if (!response.ok) {
+                const err = await response.json().catch(() => ({}));
+                throw new Error(err.error || 'Transcription failed');
+            }
 
             const data = await response.json();
             if (data.text) {
                 onTranscription(data.text);
             }
         } catch (error) {
-            console.error("Error sending audio:", error);
+            console.error("Transcription error:", error);
         } finally {
             setIsProcessing(false);
         }

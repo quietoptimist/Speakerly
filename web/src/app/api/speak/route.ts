@@ -1,10 +1,8 @@
 import { NextResponse } from "next/server";
 
-export async function GET(req: Request) {
+export async function POST(req: Request) {
     try {
-        const { searchParams } = new URL(req.url);
-        const text = searchParams.get('text');
-        const voice = searchParams.get('voice') || "alloy";
+        const { text, voice = "alloy" } = await req.json();
 
         if (!text) {
             return new NextResponse("Text is required", { status: 400 });
@@ -20,7 +18,7 @@ export async function GET(req: Request) {
             },
             body: JSON.stringify({
                 model: "tts-1",
-                voice: voice,
+                voice,
                 input: text,
                 response_format: "mp3"
             })
@@ -36,7 +34,7 @@ export async function GET(req: Request) {
             status: 200,
             headers: {
                 "Content-Type": "audio/mpeg",
-                "Cache-Control": "public, s-maxage=31536000, max-age=31536000", // Cache indefinitely on CDN
+                "Cache-Control": "public, s-maxage=31536000, max-age=31536000",
             }
         });
 

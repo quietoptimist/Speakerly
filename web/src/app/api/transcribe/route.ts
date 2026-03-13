@@ -15,8 +15,7 @@ export async function POST(req: Request) {
         }
 
         // Convert Blob to File object for the SDK
-        // Use the correct extension so Whisper can identify the format (Safari sends mp4, others webm)
-        const ext = file.type.includes('mp4') ? 'mp4' : 'webm';
+        const ext = file.type.includes('wav') ? 'wav' : file.type.includes('mp4') ? 'mp4' : 'webm';
         const audioFile = new File([file], `audio.${ext}`, { type: file.type });
 
         const response = await openai.audio.transcriptions.create({

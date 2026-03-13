@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import { Volume2, Loader2 } from "lucide-react";
 import { speakText } from "@/lib/speech";
 import { TopBar } from "@/components/layout/TopBar";
@@ -24,7 +23,6 @@ const responseSchema = z.object({
 });
 
 export default function Home() {
-  const router = useRouter();
   const [transcript, setTranscript] = useState("");
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [activeContextPath, setActiveContextPath] = useState<ContextNode[]>([]);
@@ -36,6 +34,9 @@ export default function Home() {
   // Interlocutors State
   const [interlocutors, setInterlocutors] = useState<any[]>([]);
   const [selectedInterlocutorId, setSelectedInterlocutorId] = useState<string | null>(null);
+  const [isAddingPerson, setIsAddingPerson] = useState(false);
+  const [newPersonName, setNewPersonName] = useState("");
+  const [isCreatingPerson, setIsCreatingPerson] = useState(false);
 
   const triggerBackgroundDistillation = useCallback((interlocutorId?: string | null) => {
     fetch('/api/distill', {
@@ -44,6 +45,29 @@ export default function Home() {
       body: JSON.stringify({ interlocutor_id: interlocutorId ?? null })
     }).catch(() => {});
   }, []);
+
+  const quickAddPerson = useCallback(async () => {
+    const name = newPersonName.trim();
+    if (!name) return;
+    setIsCreatingPerson(true);
+    try {
+      const res = await fetch('/api/interlocutors', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name })
+      });
+      if (res.ok) {
+        const person = await res.json();
+        setInterlocutors(prev => [person, ...prev]);
+        setSelectedInterlocutorId(person.id);
+        triggerBackgroundDistillation(person.id);
+      }
+    } catch { /* non-fatal */ } finally {
+      setIsCreatingPerson(false);
+      setIsAddingPerson(false);
+      setNewPersonName("");
+    }
+  }, [newPersonName, triggerBackgroundDistillation]);
 
   // Fetch interlocutors on mount, then trigger background distillation
   useEffect(() => {
@@ -79,7 +103,10 @@ export default function Home() {
   const [questionWords, setQuestionWords] = useState<SuggestedWord[]>([]);
   const [dynamicQuickReplies, setDynamicQuickReplies] = useState<string[]>([]);
   const [selectedWords, setSelectedWords] = useState<string[]>([]);
-  const [requestedWordCount, setRequestedWordCount] = useState(10);
+  const [requestedWordCount] = useState(() => {
+    if (typeof window === 'undefined') return 10;
+    return parseInt(localStorage.getItem('speakerly_word_count') || '10', 10);
+  });
 
   const [isLoading, setIsLoading] = useState(false);
   const [isWordsLoading, setIsWordsLoading] = useState(false);
@@ -332,28 +359,58 @@ export default function Home() {
         {/* ── Sticky panel: interlocutor selector, history, reply box ── */}
         <div className="sticky top-[88px] z-10 bg-slate-950 flex flex-col gap-3 px-4 pt-4 pb-3 border-b border-slate-800/60">
           {/* Interlocutor selector */}
-          <select
-            value={selectedInterlocutorId || ''}
-            onChange={(e) => {
-              const val = e.target.value;
-              if (val === 'ADD_NEW') {
-                router.push('/profile/interlocutors');
-              } else {
-                setSelectedInterlocutorId(val || null);
-              }
-            }}
-            className="w-full bg-slate-900 border border-slate-700 text-slate-200 text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
-          >
-            <option value="">Talking to: Anyone (Unspecified)</option>
-            <option value="ADD_NEW">+ Add New Person...</option>
-            <optgroup label="My People">
-              {interlocutors.map(person => (
-                <option key={person.id} value={person.id}>
-                  {person.name} {person.relationship ? `(${person.relationship})` : ''}
-                </option>
-              ))}
-            </optgroup>
-          </select>
+          {isAddingPerson ? (
+            <div className="flex gap-2 items-center">
+              <input
+                autoFocus
+                type="text"
+                value={newPersonName}
+                onChange={e => setNewPersonName(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') quickAddPerson();
+                  if (e.key === 'Escape') { setIsAddingPerson(false); setNewPersonName(""); }
+                }}
+                placeholder="Enter their name..."
+                className="flex-1 bg-slate-900 border border-cyan-500/50 text-slate-200 text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 placeholder:text-slate-600"
+              />
+              <button
+                onClick={quickAddPerson}
+                disabled={!newPersonName.trim() || isCreatingPerson}
+                className="px-4 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 disabled:opacity-40 text-white text-sm font-medium transition-all"
+              >
+                {isCreatingPerson ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Add'}
+              </button>
+              <button
+                onClick={() => { setIsAddingPerson(false); setNewPersonName(""); }}
+                className="px-3 py-2.5 rounded-xl text-slate-500 hover:text-slate-300 text-sm"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <select
+              value={selectedInterlocutorId || ''}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val === 'ADD_NEW') {
+                  setIsAddingPerson(true);
+                } else {
+                  setSelectedInterlocutorId(val || null);
+                }
+              }}
+              className="w-full bg-slate-900 border border-slate-700 text-slate-200 text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
+            >
+              <option value="">Talking to: Anyone (Unspecified)</option>
+              <option value="ADD_NEW">+ Add New Person...</option>
+              <optgroup label="My People">
+                {interlocutors.map(person => (
+                  <option key={person.id} value={person.id}>
+                    {person.name} {person.relationship ? `(${person.relationship})` : ''}
+                  </option>
+                ))}
+              </optgroup>
+            </select>
+          )}
 
           {/* Transcript History */}
           <div className="h-[180px]">
@@ -406,8 +463,6 @@ export default function Home() {
               statementWords={statementWords}
               questionWords={questionWords}
               selectedWords={selectedWords}
-              requestedCount={requestedWordCount}
-              onCountChange={(delta) => setRequestedWordCount(Math.max(10, Math.min(40, requestedWordCount + delta)))}
               isLoading={isLoading}
               isManualMode={isManualMode}
               isWordsLoading={isWordsLoading}

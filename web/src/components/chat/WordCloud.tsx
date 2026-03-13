@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Plus, Minus, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 export interface SuggestedWord {
     word: string;
@@ -11,8 +11,6 @@ interface WordCloudProps {
     questionWords: SuggestedWord[];
     selectedWords: string[];
     onWordToggle: (word: string) => void;
-    requestedCount: number;
-    onCountChange: (delta: number) => void;
     isLoading: boolean;
     isManualMode?: boolean;
     onUpdateWords?: () => void;
@@ -21,17 +19,15 @@ interface WordCloudProps {
 
 const unselectedWordClass = "bg-slate-800/60 text-slate-300 border-slate-700/50";
 
-export function WordCloud({ 
-    statementWords, 
-    questionWords, 
-    selectedWords, 
-    onWordToggle, 
-    requestedCount, 
-    onCountChange, 
-    isLoading, 
-    isManualMode, 
-    onUpdateWords, 
-    isWordsLoading 
+export function WordCloud({
+    statementWords,
+    questionWords,
+    selectedWords,
+    onWordToggle,
+    isLoading,
+    isManualMode,
+    onUpdateWords,
+    isWordsLoading
 }: WordCloudProps) {
     const WordList = ({ words, label, isLoading: listLoading }: { words: SuggestedWord[], label: string, isLoading: boolean }) => (
         <div className="flex-1 flex flex-col min-w-0">
@@ -83,25 +79,6 @@ export function WordCloud({
                     )}
                 </div>
 
-                <div className="flex flex-col items-center bg-slate-900/60 rounded-md overflow-hidden border border-slate-800">
-                    <button
-                        onClick={() => onCountChange(1)}
-                        disabled={requestedCount >= 40 || !!isLoading}
-                        className="px-1.5 py-0.5 hover:bg-slate-800 disabled:opacity-30 transition-colors"
-                    >
-                        <Plus className="h-2.5 w-2.5 text-slate-400" />
-                    </button>
-                    <div className="text-[8px] font-mono text-slate-500 border-y border-slate-800 w-full text-center py-0">
-                        {requestedCount}
-                    </div>
-                    <button
-                        onClick={() => onCountChange(-1)}
-                        disabled={requestedCount <= 10 || !!isLoading}
-                        className="px-1.5 py-0.5 hover:bg-slate-800 disabled:opacity-30 transition-colors"
-                    >
-                        <Minus className="h-2.5 w-2.5 text-slate-400" />
-                    </button>
-                </div>
             </div>
 
             <div className="flex-1 flex gap-4 overflow-hidden">
