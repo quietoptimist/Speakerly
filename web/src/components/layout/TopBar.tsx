@@ -27,7 +27,7 @@ export function TopBar({
 }: TopBarProps) {
 
     return (
-        <header className="flex items-center justify-between p-4 bg-slate-900 border-b border-slate-800">
+        <header className="sticky top-0 z-10 flex items-center justify-between p-4 bg-slate-900 border-b border-slate-800">
             <div className="flex gap-2 items-center">
                 <Button variant="ghost" size="icon" className="text-slate-400 hover:text-white">
                     <Menu className="h-6 w-6" />

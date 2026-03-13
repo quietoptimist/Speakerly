@@ -223,9 +223,9 @@ export function ContextHierarchy({ activeContextPath, setActiveContextPath, onSu
     }
 
     return (
-        <div className="bg-slate-900/50 rounded-xl border border-slate-800 p-4 space-y-4">
-            <div className="flex justify-between items-center pb-2 border-b border-slate-800/50">
-                <h3 className="text-sm font-semibold text-slate-300">Situational Context</h3>
+        <div className="bg-slate-900/50 rounded-xl border border-slate-800 p-2.5 space-y-2">
+            <div className="flex justify-between items-center pb-1.5 border-b border-slate-800/50">
+                <h3 className="text-xs font-semibold text-slate-300">Situational Context</h3>
                 {isDefaultView ? (
                     <Button variant="outline" size="sm" onClick={copyDefaults} disabled={isSaving} className="h-7 text-xs border-cyan-800/50 hover:bg-cyan-900/20 text-cyan-400">
                         <Edit className="h-3 w-3 mr-1" /> Override Defaults
@@ -239,9 +239,9 @@ export function ContextHierarchy({ activeContextPath, setActiveContextPath, onSu
 
             {error && <div className="text-red-400 text-xs">{error}</div>}
 
-            <div className="space-y-3">
+            <div className="space-y-1.5">
                 {layersToDisplay.map((layer, idx) => (
-                    <div key={`layer-${idx}`} className="flex flex-wrap items-center gap-2">
+                    <div key={`layer-${idx}`} className="flex flex-wrap items-center gap-1.5">
                         {idx > 0 && <ChevronRight className="h-4 w-4 text-slate-600 shrink-0" />}
                         
                         {layer.nodes.map(node => {
@@ -283,7 +283,7 @@ export function ContextHierarchy({ activeContextPath, setActiveContextPath, onSu
                                         variant={isSelected ? "secondary" : "outline"}
                                         size="sm"
                                         onClick={() => handleSelect(idx, node)}
-                                        className={`rounded-full border-slate-700 transition-all ${
+                                        className={`rounded-full border-slate-700 transition-all text-xs h-6 px-2.5 ${
                                             isSelected 
                                             ? "bg-slate-700 text-cyan-400 border-cyan-600/50" 
                                             : "bg-slate-800/50 text-slate-400 hover:text-slate-200"
@@ -351,7 +351,7 @@ export function ContextHierarchy({ activeContextPath, setActiveContextPath, onSu
             </div>
 
             {activeContextPath.length > 0 && (
-                <div className="mt-4 pt-3 border-t border-slate-800/50 flex gap-2 text-xs text-slate-500">
+                <div className="mt-1.5 pt-2 border-t border-slate-800/50 flex gap-2 text-xs text-slate-500">
                     <span className="font-semibold text-slate-400">Current Context:</span>
                     {activeContextPath.map(n => n.name).join(' → ')}
                 </div>

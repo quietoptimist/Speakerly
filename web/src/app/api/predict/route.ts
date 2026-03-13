@@ -5,6 +5,7 @@ import { anthropic } from "@ai-sdk/anthropic";
 import { z } from "zod";
 import { getCoreInstructions, getStateDescription } from "@/lib/prompts";
 import { createClient } from "@/utils/supabase/server";
+import { STOP_WORDS } from "@/lib/stopWords";
 
 // Ensure Edge runtime isn't strictly required if relying on Node APIs, but standard Next.js handles this
 export const maxDuration = 60; 
@@ -86,8 +87,90 @@ export async function POST(req: Request) {
              const parts: string[] = [];
              parts.push(`You are currently speaking to: ${interlocutor.name} ${interlocutor.relationship ? `(${interlocutor.relationship})` : ''}`);
              if (interlocutor.profile_md?.trim()) parts.push(`## About Them\n${interlocutor.profile_md}`);
+
+             // Inject last session from conversation_log
+             const { data: latest } = await supabase
+               .from('conversation_log')
+               .select('created_at')
+               .eq('user_id', user.id)
+               .eq('interlocutor_id', interlocutor_id)
+               .order('created_at', { ascending: false })
+               .limit(1)
+               .single();
+
+             if (latest) {
+               const windowStart = new Date(
+                 new Date(latest.created_at).getTime() - 60 * 60 * 1000
+               ).toISOString();
+               const { data: sessionRows } = await supabase
+                 .from('conversation_log')
+                 .select('messages, context_path, created_at')
+                 .eq('user_id', user.id)
+                 .eq('interlocutor_id', interlocutor_id)
+                 .gte('created_at', windowStart)
+                 .order('created_at', { ascending: true });
+
+               if (sessionRows && sessionRows.length > 0) {
+                 const sessionDate = new Date(latest.created_at).toLocaleDateString();
+                 const allMessages = sessionRows.flatMap((r: any) => r.messages as { role: string; text: string }[]);
+                 const formatted = allMessages
+                   .map(m => `${m.role === 'user' ? 'User' : 'Partner'}: ${m.text}`)
+                   .join('\n');
+                 parts.push(`## Last Conversation (${sessionDate})\n${formatted}`);
+               }
+             }
+
              if (interlocutor.learned_md?.trim()) parts.push(`## Learned Interaction Habits\n${interlocutor.learned_md}`);
              personaContext += `\n--- INTERLOCUTOR CONTEXT ---\n${parts.join('\n\n')}\n`;
+          }
+        }
+
+        // Context-specific vocabulary from usage history
+        if (context && context.length > 0) {
+          const { data: events } = await supabase
+            .from('usage_events')
+            .select('selected_topics, phrase_spoken')
+            .eq('user_id', user.id)
+            .contains('context_path', context)
+            .order('created_at', { ascending: false })
+            .limit(100);
+
+          const { data: logs } = await supabase
+            .from('conversation_log')
+            .select('messages')
+            .eq('user_id', user.id)
+            .contains('context_path', context)
+            .order('created_at', { ascending: false })
+            .limit(50);
+
+          const freq: Record<string, number> = {};
+          const addTokens = (text: string) => {
+            text.toLowerCase()
+              .split(/[\s,\.!?;:'"()\-]+/)
+              .filter(w => w.length >= 3 && !STOP_WORDS.has(w))
+              .forEach(w => { freq[w] = (freq[w] || 0) + 1; });
+          };
+
+          for (const e of events || []) {
+            for (const w of (e.selected_topics || [])) {
+              const lower = (w as string).toLowerCase();
+              if (!STOP_WORDS.has(lower)) freq[lower] = (freq[lower] || 0) + 2;
+            }
+            if (e.phrase_spoken) addTokens(e.phrase_spoken);
+          }
+          for (const log of logs || []) {
+            for (const m of (log.messages as { role: string; text: string }[] || [])) {
+              if (m.role === 'user') addTokens(m.text);
+            }
+          }
+
+          const topWords = Object.entries(freq)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 20)
+            .map(([w]) => w);
+
+          if (topWords.length > 0) {
+            personaContext += `\n## Vocabulary Observed in This Context\n(Prefer these words in suggestions): ${topWords.join(', ')}\n`;
           }
         }
       }

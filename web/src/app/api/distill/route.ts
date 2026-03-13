@@ -24,48 +24,50 @@ export async function POST(req: Request) {
   }
 
   let existingLearned = '(No existing profile yet)';
-  
+  let lastDistilledAt: string | null = null;
+
   if (interlocutorId) {
     const { data: interlocutor } = await supabase
         .from('interlocutors')
-        .select('name, learned_md')
+        .select('name, learned_md, last_distilled_at')
         .eq('id', interlocutorId)
         .eq('user_id', user.id)
         .single()
     existingLearned = interlocutor?.learned_md || existingLearned;
     interlocutorName = interlocutor?.name;
+    lastDistilledAt = interlocutor?.last_distilled_at || null;
   } else {
-    // 1. Fetch current user learned_md
     const { data: persona } = await supabase
       .from('user_personas')
-      .select('learned_md')
+      .select('learned_md, last_distilled_at')
       .eq('user_id', user.id)
       .single()
     existingLearned = persona?.learned_md || existingLearned;
+    lastDistilledAt = persona?.last_distilled_at || null;
   }
 
-  // 2. Fetch recent conversation logs
+  // Fetch only conversation logs created after last distillation
   let query = supabase
     .from('conversation_log')
     .select('messages, context_path, created_at')
     .eq('user_id', user.id)
-    .order('created_at', { ascending: false })
-    .limit(50);
-    
+    .order('created_at', { ascending: true });
+
+  if (lastDistilledAt) {
+    query = query.gt('created_at', lastDistilledAt);
+  }
+
   if (interlocutorId) {
      query = query.eq('interlocutor_id', interlocutorId);
-  } else {
-     // If distilling the main user, we can either look at all logs, 
-     // or just logs where interlocutor_id is null. Let's look at all logs for a holistic user view.
   }
 
   const { data: logs } = await query;
 
   if (!logs || logs.length === 0) {
-    return NextResponse.json({ message: 'No conversations to distill yet' })
+    return NextResponse.json({ message: 'Nothing new to distill' })
   }
 
-  // 3. Format conversation logs for the prompt
+  // Format conversation logs for the prompt
   const formattedLogs = logs.map((log, i) => {
     const contextStr = (log.context_path || []).join(' → ')
     const messagesStr = (log.messages as any[])
@@ -74,12 +76,35 @@ export async function POST(req: Request) {
     return `### Session ${i + 1} (${log.created_at})${contextStr ? ` — Context: ${contextStr}` : ''}\n${messagesStr}`
   }).join('\n\n')
 
-  // 4. Build the distillation prompt
+  // Build context summary for interlocutor distillation
+  let contextSummary: string | undefined = undefined;
+  if (interlocutorId) {
+    const { data: ctxData } = await supabase
+      .from('conversation_log')
+      .select('context_path')
+      .eq('user_id', user.id)
+      .eq('interlocutor_id', interlocutorId)
+      .not('context_path', 'is', null);
+
+    const ctxFreq: Record<string, number> = {};
+    for (const row of ctxData || []) {
+      const key = (row.context_path || []).join(' > ');
+      if (key) ctxFreq[key] = (ctxFreq[key] || 0) + 1;
+    }
+    const top = Object.entries(ctxFreq)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([k, v]) => `${k} (${v} sessions)`)
+      .join(', ');
+    if (top) contextSummary = `Most frequent contexts: ${top}`;
+  }
+
+  // Build the distillation prompt
   const prompt = interlocutorId && interlocutorName
-    ? getInterlocutorDistillPrompt(existingLearned, formattedLogs, interlocutorName)
+    ? getInterlocutorDistillPrompt(existingLearned, formattedLogs, interlocutorName, contextSummary)
     : getUserDistillPrompt(existingLearned, formattedLogs)
 
-  // 5. Call the LLM
+  // Call the LLM
   try {
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
@@ -91,18 +116,20 @@ export async function POST(req: Request) {
     })
 
     const newLearnedMd = completion.choices[0]?.message?.content || existingLearned
+    const now = new Date().toISOString();
 
-    // 6. Save the updated learned_md
+    // Save the updated learned_md and last_distilled_at
     if (interlocutorId) {
         const { error: updateError } = await supabase
             .from('interlocutors')
             .update({
                 learned_md: newLearnedMd,
-                updated_at: new Date().toISOString()
+                last_distilled_at: now,
+                updated_at: now
             })
             .eq('id', interlocutorId)
             .eq('user_id', user.id);
-            
+
         if (updateError) throw updateError;
     } else {
         const { error: updateError } = await supabase
@@ -110,9 +137,10 @@ export async function POST(req: Request) {
           .upsert({
             user_id: user.id,
             learned_md: newLearnedMd,
-            updated_at: new Date().toISOString()
+            last_distilled_at: now,
+            updated_at: now
           }, { onConflict: 'user_id' })
-          
+
         if (updateError) throw updateError;
     }
 

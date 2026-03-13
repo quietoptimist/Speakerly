@@ -25,26 +25,33 @@ export function speakText(text: string, onStart?: () => void, onEnd?: () => void
 
   try {
     const url = `/api/speak?text=${encodeURIComponent(text)}`;
-    currentAudio = new Audio(url);
+    // Keep a local ref so event handlers still see the element after currentAudio is nulled by cancelSpeech()
+    const audio = new Audio(url);
+    currentAudio = audio;
 
-    currentAudio.onplay = () => {
+    audio.onplay = () => {
       if (onStart) onStart();
     };
 
-    currentAudio.onended = () => {
+    audio.onended = () => {
       if (onEnd) onEnd();
       currentAudio = null;
     };
 
-    currentAudio.onerror = (e) => {
-      console.error("Audio playback error:", e);
+    audio.onerror = () => {
+      // Code 1 = MEDIA_ERR_ABORTED: fired when cancelSpeech() sets src='' — not a real error
+      if (audio.error?.code !== MediaError.MEDIA_ERR_ABORTED) {
+        console.error("Audio playback error:", audio.error);
+      }
       if (onEnd) onEnd();
       currentAudio = null;
     };
 
-    // The play() method returns a Promise which can reject if auto-play is blocked.
-    currentAudio.play().catch(e => {
-      console.error("Audio play blocked:", e);
+    // play() rejects with AbortError when interrupted by cancelSpeech() — not a real error
+    audio.play().catch(e => {
+      if (e.name !== 'AbortError') {
+        console.error("Audio play blocked:", e);
+      }
       if (onEnd) onEnd();
       currentAudio = null;
     });

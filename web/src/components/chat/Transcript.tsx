@@ -40,14 +40,14 @@ export function Transcript({ messages, onClear }: TranscriptProps) {
                     New Chat
                 </Button>
             </div>
-            <ScrollArea className="flex-1 min-h-0 rounded-md bg-slate-900/50 p-4 border border-slate-800">
-                <div className="flex flex-col gap-3">
+            <ScrollArea className="flex-1 min-h-0 rounded-md bg-slate-900/50 p-2 border border-slate-800">
+                <div className="flex flex-col gap-1.5">
                     {messages.length === 0 ? (
-                        <div className="text-slate-600 italic text-sm text-center mt-4">No conversation history yet. Start talking!</div>
+                        <div className="text-slate-600 italic text-xs text-center mt-3">No conversation history yet. Start talking!</div>
                     ) : (
                         messages.map((msg, i) => (
                             <div key={`msg-${msg.role}-${i}`} className={`flex w-full ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                                <div className={`max-w-[80%] rounded-xl px-4 py-2 text-sm sm:text-base ${msg.role === "user"
+                                <div className={`max-w-[85%] rounded-xl px-3 py-1 text-xs ${msg.role === "user"
                                     ? "bg-cyan-600/20 border border-cyan-500/30 text-cyan-50 rounded-br-sm"
                                     : "bg-slate-800 border border-slate-700 text-slate-200 rounded-bl-sm"
                                     }`}>

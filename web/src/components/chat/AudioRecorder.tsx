@@ -15,8 +15,15 @@ export function AudioRecorder({ onTranscription }: AudioRecorderProps) {
 
     const startRecording = async () => {
         try {
+            if (!navigator.mediaDevices?.getUserMedia) {
+                alert("Microphone access is not available. Make sure the page is served over HTTPS or localhost.");
+                return;
+            }
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            mediaRecorderRef.current = new MediaRecorder(stream);
+
+            // Safari supports audio/mp4; other browsers prefer audio/webm
+            const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4';
+            mediaRecorderRef.current = new MediaRecorder(stream, { mimeType });
             chunksRef.current = [];
 
             mediaRecorderRef.current.ondataavailable = (e) => {
@@ -26,7 +33,7 @@ export function AudioRecorder({ onTranscription }: AudioRecorderProps) {
             };
 
             mediaRecorderRef.current.onstop = async () => {
-                const audioBlob = new Blob(chunksRef.current, { type: 'audio/webm' });
+                const audioBlob = new Blob(chunksRef.current, { type: mimeType });
                 await processAudio(audioBlob);
                 stream.getTracks().forEach(track => track.stop());
             };
@@ -49,8 +56,9 @@ export function AudioRecorder({ onTranscription }: AudioRecorderProps) {
     const processAudio = async (blob: Blob) => {
         setIsProcessing(true);
         try {
+            const ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
             const formData = new FormData();
-            formData.append('file', blob, 'recording.webm');
+            formData.append('file', blob, `recording.${ext}`);
 
             const response = await fetch('/api/transcribe', {
                 method: 'POST',

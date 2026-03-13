@@ -37,17 +37,42 @@ export default function Home() {
   const [interlocutors, setInterlocutors] = useState<any[]>([]);
   const [selectedInterlocutorId, setSelectedInterlocutorId] = useState<string | null>(null);
 
-  // Fetch interlocutors on mount
+  const triggerBackgroundDistillation = useCallback((interlocutorId?: string | null) => {
+    fetch('/api/distill', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ interlocutor_id: interlocutorId ?? null })
+    }).catch(() => {});
+  }, []);
+
+  // Fetch interlocutors on mount, then trigger background distillation
   useEffect(() => {
     fetch('/api/interlocutors').then(r => r.json()).then(data => {
       if (Array.isArray(data)) {
         setInterlocutors(data);
         if (data.length > 0) {
-            setSelectedInterlocutorId(data[0].id); // Select most recent by default
+            const firstId = data[0].id;
+            setSelectedInterlocutorId(firstId);
+            triggerBackgroundDistillation(firstId);
+        } else {
+            triggerBackgroundDistillation(null);
         }
       }
     }).catch(console.error);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Re-distill whenever user switches to a different interlocutor
+  const prevInterlocutorRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (selectedInterlocutorId !== prevInterlocutorRef.current) {
+      prevInterlocutorRef.current = selectedInterlocutorId;
+      // Skip the initial mount (handled in the interlocutors fetch effect)
+      if (interlocutors.length > 0) {
+        triggerBackgroundDistillation(selectedInterlocutorId);
+      }
+    }
+  }, [selectedInterlocutorId, interlocutors.length, triggerBackgroundDistillation]);
 
   // Word Cloud States
   const [statementWords, setStatementWords] = useState<SuggestedWord[]>([]);
@@ -294,17 +319,19 @@ export default function Home() {
   };
 
   return (
-    <main className="flex flex-col h-screen bg-slate-950 text-slate-50 overflow-hidden">
-      {/* Tier 1: Top Bar */}
+    <main className="min-h-screen bg-slate-950 text-slate-50">
+      {/* Top Bar — sticky */}
       <TopBar
         isManualMode={isManualMode} setIsManualMode={setIsManualMode}
         onTranscription={handleNewTranscription}
         selectedModel={selectedModel} setSelectedModel={setSelectedModel}
       />
 
-      <div className="flex-1 flex flex-col p-4 gap-3 overflow-hidden max-w-4xl mx-auto w-full">
-        {/* Interlocutor selector */}
-        <div className="shrink-0">
+      <div className="max-w-4xl mx-auto w-full">
+
+        {/* ── Sticky panel: interlocutor selector, history, reply box ── */}
+        <div className="sticky top-[88px] z-10 bg-slate-950 flex flex-col gap-3 px-4 pt-4 pb-3 border-b border-slate-800/60">
+          {/* Interlocutor selector */}
           <select
             value={selectedInterlocutorId || ''}
             onChange={(e) => {
@@ -327,120 +354,125 @@ export default function Home() {
               ))}
             </optgroup>
           </select>
+
+          {/* Transcript History */}
+          <div className="h-[180px]">
+            <Transcript
+              messages={chatHistory}
+              onClear={() => {
+                setChatHistory([]);
+                setTranscript("");
+                setSelectedWords([]);
+              }}
+            />
+          </div>
+
+          {/* Reply Input Box */}
+          <div className="flex gap-2 items-center">
+            <input
+              type="text"
+              value={replyDraft}
+              onChange={(e) => setReplyDraft(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && replyDraft.trim()) speakReply(replyDraft.trim()); }}
+              placeholder="Type or click a suggestion to build your reply..."
+              className="flex-1 bg-slate-900 border border-slate-700 rounded-full px-4 py-2.5 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
+            />
+            <button
+              onClick={() => { if (replyDraft.trim()) speakReply(replyDraft.trim()); }}
+              disabled={!replyDraft.trim() || isSpeaking}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold transition-all active:scale-95"
+            >
+              {isSpeaking ? <Loader2 className="h-4 w-4 animate-spin" /> : <Volume2 className="h-4 w-4" />}
+              Speak
+            </button>
+          </div>
         </div>
 
-        {/* Transcript History */}
-        <div className="shrink-0 h-[12%] min-h-[90px]">
-          <Transcript
-            messages={chatHistory}
-            onClear={() => {
-              setChatHistory([]);
-              setTranscript("");
-              setSelectedWords([]);
-            }}
-          />
-        </div>
+        {/* ── Scrollable content ── */}
+        <div className="flex flex-col gap-3 px-4 pt-3 pb-8">
 
-        {/* Reply Input Box */}
-        <div className="shrink-0 flex gap-2 items-center">
-          <input
-            type="text"
-            value={replyDraft}
-            onChange={(e) => setReplyDraft(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter' && replyDraft.trim()) speakReply(replyDraft.trim()); }}
-            placeholder="Type or click a suggestion to build your reply..."
-            className="flex-1 bg-slate-900 border border-slate-700 rounded-full px-4 py-2.5 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
-          />
-          <button
-            onClick={() => { if (replyDraft.trim()) speakReply(replyDraft.trim()); }}
-            disabled={!replyDraft.trim() || isSpeaking}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold transition-all active:scale-95"
-          >
-            {isSpeaking ? <Loader2 className="h-4 w-4 animate-spin" /> : <Volume2 className="h-4 w-4" />}
-            Speak
-          </button>
-        </div>
+          {/* Situational Context */}
+          <div className="border-t border-slate-800/50 pt-3">
+            <ContextHierarchy
+              activeContextPath={activeContextPath}
+              setActiveContextPath={setActiveContextPath}
+              onSuggestionsChange={setContextSuggestions}
+            />
+          </div>
 
-        {/* Situational Context */}
-        <div className="shrink-0 border-t border-slate-800/50 pt-3">
-          <ContextHierarchy
-            activeContextPath={activeContextPath}
-            setActiveContextPath={setActiveContextPath}
-            onSuggestionsChange={setContextSuggestions}
-          />
-        </div>
+          {/* Word Cloud (Split View) */}
+          <div className="h-[200px] pt-1 border-t border-slate-800/50">
+            <WordCloud
+              statementWords={statementWords}
+              questionWords={questionWords}
+              selectedWords={selectedWords}
+              requestedCount={requestedWordCount}
+              onCountChange={(delta) => setRequestedWordCount(Math.max(10, Math.min(40, requestedWordCount + delta)))}
+              isLoading={isLoading}
+              isManualMode={isManualMode}
+              isWordsLoading={isWordsLoading}
+              onUpdateWords={() => fetchFastWords(transcript, selectedWords)}
+              onWordToggle={(word) => {
+                const newWords = selectedWords.includes(word)
+                  ? selectedWords.filter(w => w !== word)
+                  : [...selectedWords, word];
+                setSelectedWords(newWords);
 
-        {/* Word Cloud (Split View) */}
-        <div className="shrink-0 h-[15%] min-h-[190px] pt-1 border-t border-slate-800/50">
-          <WordCloud
-            statementWords={statementWords}
-            questionWords={questionWords}
-            selectedWords={selectedWords}
-            requestedCount={requestedWordCount}
-            onCountChange={(delta) => setRequestedWordCount(Math.max(10, Math.min(40, requestedWordCount + delta)))}
-            isLoading={isLoading}
-            isManualMode={isManualMode}
-            isWordsLoading={isWordsLoading}
-            onUpdateWords={() => fetchFastWords(transcript, selectedWords)}
-            onWordToggle={(word) => {
-              const newWords = selectedWords.includes(word)
-                ? selectedWords.filter(w => w !== word)
-                : [...selectedWords, word];
-              setSelectedWords(newWords);
+                const isQ = questionWords.some(w => w.word === word);
+                if (isQ && !isQuestion) setIsQuestion(true);
+                if (!isQ && isQuestion && statementWords.some(w => w.word === word)) setIsQuestion(false);
 
-              const isQ = questionWords.some(w => w.word === word);
-              if (isQ && !isQuestion) setIsQuestion(true);
-              if (!isQ && isQuestion && statementWords.some(w => w.word === word)) setIsQuestion(false);
+                if (!isManualMode) {
+                  fetchFastWords(transcript, newWords);
+                }
+              }}
+            />
+          </div>
 
-              if (!isManualMode) {
-                fetchFastWords(transcript, newWords);
-              }
-            }}
-          />
-        </div>
+          {/* Quick Backchannels */}
+          <div className="pb-1">
+            <QuickReplies
+              dynamicReplies={dynamicQuickReplies}
+              onReplySelect={(text) => {
+                setReplyDraft(prev => prev ? `${prev} ${text}` : text);
+              }}
+              onReplySpeak={(text) => {
+                speakReply(text);
+              }}
+            />
+          </div>
 
-        {/* Quick Backchannels */}
-        <div className="shrink-0 pb-1">
-          <QuickReplies
-            dynamicReplies={dynamicQuickReplies}
-            onReplySelect={(text) => {
-              setReplyDraft(prev => prev ? `${prev} ${text}` : text);
-            }}
-            onReplySpeak={(text) => {
-              speakReply(text);
-            }}
-          />
-        </div>
+          {/* AI Responses — two-column (statements | questions) */}
+          <div className="h-[360px] flex flex-col gap-1">
+            {isManualMode && (
+              <div className="flex justify-end pr-1 mb-1">
+                <button
+                  onClick={() => generatePredictions(transcript, selectedWords)}
+                  className="text-xs font-semibold text-cyan-400 hover:text-cyan-300 flex items-center gap-1 bg-cyan-500/10 border border-cyan-500/30 px-4 py-1.5 rounded-full shadow-[0_0_10px_rgba(6,182,212,0.1)] hover:bg-cyan-500/20 hover:scale-105 active:scale-95 transition-all h-7"
+                >
+                  Generate Now
+                </button>
+              </div>
+            )}
+            <ResponseGrid
+              statementResponses={statementResponses}
+              questionResponses={questionResponses}
+              isLoading={isLoading}
+              onResponseSelect={(response) => {
+                setReplyDraft(prev => prev ? `${prev} ${response.body}` : response.body);
+              }}
+              onResponseSpeak={(response) => {
+                speakReply(response.body);
+              }}
+            />
+          </div>
 
-        {/* AI Responses — two-column (statements | questions) */}
-        <div className="flex-1 overflow-hidden flex flex-col gap-1">
-          {isManualMode && (
-            <div className="flex justify-end pr-1 mb-1">
-              <button
-                onClick={() => generatePredictions(transcript, selectedWords)}
-                className="text-xs font-semibold text-cyan-400 hover:text-cyan-300 flex items-center gap-1 bg-cyan-500/10 border border-cyan-500/30 px-4 py-1.5 rounded-full shadow-[0_0_10px_rgba(6,182,212,0.1)] hover:bg-cyan-500/20 hover:scale-105 active:scale-95 transition-all h-7"
-              >
-                Generate Now
-              </button>
-            </div>
-          )}
-          <ResponseGrid
-            statementResponses={statementResponses}
-            questionResponses={questionResponses}
-            isLoading={isLoading}
-            onResponseSelect={(response) => {
-              setReplyDraft(prev => prev ? `${prev} ${response.body}` : response.body);
-            }}
-            onResponseSpeak={(response) => {
-              speakReply(response.body);
-            }}
-          />
         </div>
       </div>
 
       {/* Footer / Error Banner */}
       {apiError && (
-        <div className="bg-red-500/20 border-t border-red-500/50 p-2 text-red-200 text-xs text-center flex items-center justify-center gap-2 mt-auto shrink-0 z-50">
+        <div className="bg-red-500/20 border-t border-red-500/50 p-2 text-red-200 text-xs text-center flex items-center justify-center gap-2 z-50">
           <span className="font-semibold">AI Error:</span> {apiError}
         </div>
       )}

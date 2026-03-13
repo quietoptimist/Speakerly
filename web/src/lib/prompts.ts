@@ -59,7 +59,7 @@ CRITICAL RULES FOR EXTRACTION:
 2. EXTRACT THE SPECIFIC: Only extract unique preferences, names, relationships, or habits.
 3. CAPTURE EVENTS & DATES: Actively look for dates, times, upcoming events, or past milestones.
 4. SYNTHESIZE: Blend new insights into the existing profile naturally.
-5. PRUNE: If a new conversation directly contradicts an old insight, remove the old one.
+5. PRUNE: Remove ONLY insights directly contradicted by new evidence. NEVER remove stable facts (names, dates of birth, anniversaries, diagnoses, long-established preferences) simply because they were not mentioned in recent exchanges. Treat the existing profile as ground truth; override only when new evidence contradicts it.
 6. FORMAT: Use clear section headers and bullet points. Write in the third person.
 
 Existing learned profile:
@@ -70,7 +70,7 @@ ${formattedLogs}
 
 Output ONLY the updated Markdown profile. Do not include any introductory or concluding remarks.`;
 
-export const getInterlocutorDistillPrompt = (existingLearned: string, formattedLogs: string, interlocutorName: string) => `You are analyzing conversation logs for an AAC (Augmentative and Alternative Communication) user's history with ${interlocutorName}.
+export const getInterlocutorDistillPrompt = (existingLearned: string, formattedLogs: string, interlocutorName: string, contextSummary?: string) => `You are analyzing conversation logs for an AAC (Augmentative and Alternative Communication) user's history with ${interlocutorName}.
 Given the following recent conversations and existing learned profile, extract NEW, HIGHLY SPECIFIC insights about the interaction habits with ${interlocutorName}.
 
 CRITICAL RULES FOR EXTRACTION:
@@ -78,9 +78,10 @@ CRITICAL RULES FOR EXTRACTION:
 2. EXTRACT THE SPECIFIC: Only extract unique preferences, names, or habits of ${interlocutorName}.
 3. CAPTURE EVENTS & DATES: Actively look for dates, times, or upcoming events mentioned by ${interlocutorName}.
 4. SYNTHESIZE: Blend new insights into the existing profile naturally.
-5. RECENT HISTORY SUMMARY: ALWAYS add or update a brief section at the END of the profile called "## Recent History Summary". This should be a 2-3 sentence summary of the progress or outcomes of their most recent interactions. It should be written to help the AI suggest polite opening remarks or follow-up questions (e.g., "Ask how the doctor's appointment went," or "Follow up on the kitchen renovation mentioned last week").
-6. PRUNE: If a new conversation directly contradicts an old insight, remove the old one.
-7. FORMAT: Use clear section headers and bullet points. Write in the third person (e.g. "${interlocutorName} prefers..." not "You prefer...").
+5. CONTEXT-SPECIFIC HABITS: If any conversations happened in a specific location (e.g., "Cafe", "Medical") AND the topic or content is clearly driven by that location (e.g., food orders, medical topics, activities at that venue), add or update a "## Context-Specific Notes" section with sub-headings per location. Do NOT include things in this section if they would apply in any setting (e.g., "likes talking about sport" is general, not location-specific).
+6. RECENT HISTORY SUMMARY: ALWAYS add or update a brief section at the END of the profile called "## Recent History Summary". This should be a 2-3 sentence summary of the progress or outcomes of their most recent interactions. It should be written to help the AI suggest polite opening remarks or follow-up questions (e.g., "Ask how the doctor's appointment went," or "Follow up on the kitchen renovation mentioned last week").
+7. PRUNE: Remove ONLY insights directly contradicted by new evidence. NEVER remove stable facts (names, dates of birth, anniversaries, diagnoses, long-established preferences) simply because they were not mentioned in recent exchanges. Treat the existing profile as ground truth; override only when new evidence contradicts it.
+8. FORMAT: Use clear section headers and bullet points. Write in the third person (e.g. "${interlocutorName} prefers..." not "You prefer...").${contextSummary ? `\n\nContext distribution for these conversations: ${contextSummary}` : ''}
 
 Existing learned profile:
 ${existingLearned}
