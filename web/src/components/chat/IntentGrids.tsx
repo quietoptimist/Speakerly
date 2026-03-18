@@ -1,5 +1,4 @@
 import { ClickableGrid } from "./ClickableGrid";
-import { Button } from "@/components/ui/button";
 
 interface IntentGridsProps {
     grid1: { x: number; y: number };

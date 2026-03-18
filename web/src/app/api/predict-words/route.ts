@@ -14,7 +14,6 @@ export async function POST(req: Request) {
         const {
             transcript,
             chatHistory = [],
-            isQuestion,
             context,
             selectedWords = [],
             requestedWordCount = 10,
@@ -31,7 +30,7 @@ export async function POST(req: Request) {
 
         let historyPrompt = "";
         if (chatHistory && chatHistory.length > 0) {
-            historyPrompt = `\nHistory:\n${chatHistory.map((m: any) => `${m.role === 'user' ? 'User' : 'Partner'}: ${m.text}`).join('\n')}\n`;
+            historyPrompt = `\nHistory:\n${chatHistory.map((m: { role: string; text: string }) => `${m.role === 'user' ? 'User' : 'Partner'}: ${m.text}`).join('\n')}\n`;
         }
 
         const stateDesc = `Partner's latest: "${transcript}"\n${historyPrompt}`;
@@ -73,7 +72,7 @@ export async function POST(req: Request) {
                     }
                 }
             }
-        } catch (e) {
+        } catch {
             // Non-fatal
         }
 
@@ -112,7 +111,6 @@ export async function POST(req: Request) {
                 model: "gpt-5-mini",
                 response_format: { type: "json_object" },
                 messages: [{ role: "system", content: fullPrompt }],
-                // @ts-ignore
                 reasoning_effort: "minimal"
             });
             resultText = oResponse.choices[0]?.message?.content || resultText;
@@ -120,8 +118,8 @@ export async function POST(req: Request) {
 
         return NextResponse.json(JSON.parse(resultText));
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("API /predict-words error:", error);
-        return NextResponse.json({ error: error.message || "Failed to generate fast words" }, { status: 500 });
+        return NextResponse.json({ error: error instanceof Error ? error.message : "Failed to generate fast words" }, { status: 500 });
     }
 }

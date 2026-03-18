@@ -393,7 +393,7 @@ export default function ProfilesPage() {
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-2">
                                                 <Brain className="h-4 w-4 text-purple-400" />
-                                                <span className="text-sm font-medium text-slate-300">What I've Learned</span>
+                                                <span className="text-sm font-medium text-slate-300">What I&apos;ve Learned</span>
                                             </div>
                                             <div className="flex items-center gap-2">
                                                 <Button variant="outline" size="sm" onClick={() => setEditingLearnedUser(v => !v)}
@@ -521,7 +521,7 @@ export default function ProfilesPage() {
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
                                         <Brain className="h-3.5 w-3.5 text-purple-400" />
-                                        <label className="text-xs font-medium text-slate-300">What I've Learned (AI Distilled)</label>
+                                        <label className="text-xs font-medium text-slate-300">What I&apos;ve Learned (AI Distilled)</label>
                                     </div>
                                     <div className="flex gap-2">
                                         {editingId !== 'new' && (
@@ -558,7 +558,7 @@ export default function ProfilesPage() {
                                 <User className="h-10 w-10 text-slate-700 mx-auto mb-3" />
                                 <p className="text-sm text-slate-400 mb-1">No people added yet</p>
                                 <p className="text-xs text-slate-600 max-w-xs mx-auto">
-                                    Click "Add Person" to create a profile for someone you talk to regularly.
+                                    Click &quot;Add Person&quot; to create a profile for someone you talk to regularly.
                                 </p>
                             </div>
                         ) : (

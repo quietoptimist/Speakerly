@@ -31,7 +31,7 @@ export function AudioRecorder({ onTranscription }: AudioRecorderProps) {
             // This completely bypasses MediaRecorder and its mp4 fragmentation behaviour in Safari,
             // where each speech burst (separated by a pause) is emitted as an independent mp4 file
             // — making clean concatenation impossible. Raw PCM has no such issue.
-            const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+            const audioContext = new (window.AudioContext || (window as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext!)();
             audioContextRef.current = audioContext;
             sampleRateRef.current = audioContext.sampleRate;
 

@@ -24,7 +24,6 @@ export async function POST(req: Request) {
     const {
       transcript,
       chatHistory = [],
-      isQuestion,
       context,
       selectedWords = [],
       requestedWordCount = 10,
@@ -47,7 +46,7 @@ export async function POST(req: Request) {
 
     let historyPrompt = "";
     if (chatHistory && chatHistory.length > 0) {
-      historyPrompt = `\nHistory:\n${chatHistory.map((m: any) => `${m.role === 'user' ? 'User' : 'Partner'}: ${m.text}`).join('\n')}\n`;
+      historyPrompt = `\nHistory:\n${chatHistory.map((m: { role: string; text: string }) => `${m.role === 'user' ? 'User' : 'Partner'}: ${m.text}`).join('\n')}\n`;
     }
 
     const stateDesc = getStateDescription({
@@ -112,7 +111,7 @@ export async function POST(req: Request) {
 
                if (sessionRows && sessionRows.length > 0) {
                  const sessionDate = new Date(latest.created_at).toLocaleDateString();
-                 const allMessages = sessionRows.flatMap((r: any) => r.messages as { role: string; text: string }[]);
+                 const allMessages = sessionRows.flatMap((r: { messages: { role: string; text: string }[] }) => r.messages);
                  const formatted = allMessages
                    .map(m => `${m.role === 'user' ? 'User' : 'Partner'}: ${m.text}`)
                    .join('\n');
@@ -174,7 +173,7 @@ export async function POST(req: Request) {
           }
         }
       }
-    } catch (e) {
+    } catch {
       // Non-fatal
     }
 
@@ -207,8 +206,8 @@ ${selectedWordsContext}`;
 
     return result.toTextStreamResponse();
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("API /predict error:", error);
-    return new Response(JSON.stringify({ error: error.message || "Failed to generate prediction" }), { status: 500 });
+    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Failed to generate prediction" }), { status: 500 });
   }
 }

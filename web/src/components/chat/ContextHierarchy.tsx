@@ -41,7 +41,7 @@ export function ContextHierarchy({ activeContextPath, setActiveContextPath, onSu
     
     // Adding states
     const [addingToLevel, setAddingToLevel] = useState<number | null>(null)
-    const [addingParentId, setAddingParentId] = useState<string | null>(null)
+    const [, setAddingParentId] = useState<string | null>(null)
     const [addValue, setAddValue] = useState("")
     const [isMutating, setIsMutating] = useState(false)
 
@@ -78,8 +78,8 @@ export function ContextHierarchy({ activeContextPath, setActiveContextPath, onSu
                 }
                 setActiveContextPath(newPath)
             }
-        } catch (err: any) {
-            setError(err.message)
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : String(err))
         } finally {
             setIsLoading(false)
         }
@@ -104,8 +104,8 @@ export function ContextHierarchy({ activeContextPath, setActiveContextPath, onSu
             if (!res.ok) throw new Error("Failed to reset to defaults")
             await fetchData()
             setActiveContextPath([]) // Reset selection
-        } catch (err: any) {
-            setError(err.message)
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : String(err))
         } finally {
             setIsSaving(false)
         }
@@ -140,8 +140,8 @@ export function ContextHierarchy({ activeContextPath, setActiveContextPath, onSu
             await fetchData()
             setAddValue("")
             setAddingToLevel(null)
-        } catch (err: any) {
-            setError(err.message)
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : String(err))
         } finally {
             setIsMutating(false)
         }
@@ -166,8 +166,8 @@ export function ContextHierarchy({ activeContextPath, setActiveContextPath, onSu
             
             await fetchData()
             setEditingNodeId(null)
-        } catch (err: any) {
-            setError(err.message)
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : String(err))
         } finally {
             setIsMutating(false)
         }
@@ -193,8 +193,8 @@ export function ContextHierarchy({ activeContextPath, setActiveContextPath, onSu
             }
 
             await fetchData()
-        } catch (err: any) {
-            setError(err.message)
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : String(err))
         } finally {
             setIsMutating(false)
         }

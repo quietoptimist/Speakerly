@@ -19,7 +19,7 @@ export async function POST(req: Request) {
   try {
      const body = await req.json();
      interlocutorId = body.interlocutor_id || null;
-  } catch (e) {
+  } catch {
      // Ignore missing body
   }
 
@@ -70,8 +70,8 @@ export async function POST(req: Request) {
   // Format conversation logs for the prompt
   const formattedLogs = logs.map((log, i) => {
     const contextStr = (log.context_path || []).join(' → ')
-    const messagesStr = (log.messages as any[])
-      .map((m: any) => `  [${m.role}]: ${m.text}`)
+    const messagesStr = (log.messages as { role: string; text: string }[])
+      .map((m) => `  [${m.role}]: ${m.text}`)
       .join('\n')
     return `### Session ${i + 1} (${log.created_at})${contextStr ? ` — Context: ${contextStr}` : ''}\n${messagesStr}`
   }).join('\n\n')
@@ -149,8 +149,8 @@ export async function POST(req: Request) {
       learned_md: newLearnedMd,
       sessions_analyzed: logs.length
     })
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Distillation failed:', err)
-    return NextResponse.json({ error: err.message }, { status: 500 })
+    return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 })
   }
 }

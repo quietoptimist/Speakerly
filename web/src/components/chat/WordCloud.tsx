@@ -17,19 +17,18 @@ interface WordCloudProps {
     isWordsLoading?: boolean;
 }
 
+interface WordListProps {
+    words: SuggestedWord[];
+    label: string;
+    isLoading: boolean;
+    selectedWords: string[];
+    onWordToggle: (word: string) => void;
+}
+
 const unselectedWordClass = "bg-slate-800/60 text-slate-300 border-slate-700/50";
 
-export function WordCloud({
-    statementWords,
-    questionWords,
-    selectedWords,
-    onWordToggle,
-    isLoading,
-    isManualMode,
-    onUpdateWords,
-    isWordsLoading
-}: WordCloudProps) {
-    const WordList = ({ words, label, isLoading: listLoading }: { words: SuggestedWord[], label: string, isLoading: boolean }) => (
+function WordList({ words, label, isLoading: listLoading, selectedWords, onWordToggle }: WordListProps) {
+    return (
         <div className="flex-1 flex flex-col min-w-0">
             <h3 className="text-[10px] font-bold text-slate-600 uppercase tracking-tighter mb-2 pl-1 italic">{label}</h3>
             <div className="flex-1 overflow-y-auto scrollbar-none">
@@ -59,7 +58,18 @@ export function WordCloud({
             </div>
         </div>
     );
+}
 
+export function WordCloud({
+    statementWords,
+    questionWords,
+    selectedWords,
+    onWordToggle,
+    isLoading,
+    isManualMode,
+    onUpdateWords,
+    isWordsLoading
+}: WordCloudProps) {
     return (
         <div className="flex flex-col h-full bg-slate-900/40 rounded-lg border border-slate-800/80 p-3 relative overflow-hidden">
             <div className="flex justify-between items-start mb-2 shrink-0 w-full">
@@ -82,9 +92,9 @@ export function WordCloud({
             </div>
 
             <div className="flex-1 flex gap-4 overflow-hidden">
-                <WordList words={statementWords} label="Statements" isLoading={!!(isLoading || isWordsLoading)} />
+                <WordList words={statementWords} label="Statements" isLoading={!!(isLoading || isWordsLoading)} selectedWords={selectedWords} onWordToggle={onWordToggle} />
                 <div className="w-[1px] bg-slate-800/50 self-stretch my-2 shrink-0" />
-                <WordList words={questionWords} label="Questions" isLoading={!!(isLoading || isWordsLoading)} />
+                <WordList words={questionWords} label="Questions" isLoading={!!(isLoading || isWordsLoading)} selectedWords={selectedWords} onWordToggle={onWordToggle} />
             </div>
         </div>
     );

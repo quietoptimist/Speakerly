@@ -38,8 +38,8 @@ export async function POST(req: Request) {
             }
         });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("API /speak error:", error);
-        return new NextResponse(error.message || "Failed to generate speech", { status: 500 });
+        return new NextResponse(error instanceof Error ? error.message : "Failed to generate speech", { status: 500 });
     }
 }

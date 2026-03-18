@@ -115,8 +115,8 @@ export async function POST() {
 
     return NextResponse.json({ success: true, count: toInsert.length })
 
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Sync failed:', err)
-    return NextResponse.json({ error: err.message }, { status: 500 })
+    return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 })
   }
 }

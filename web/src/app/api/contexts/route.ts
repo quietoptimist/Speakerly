@@ -16,7 +16,7 @@ export async function GET() {
   // If the user has *no* custom contexts at all, return the defaults.
   // Otherwise, return *only* the user's custom contexts. (The client can explicitly call an API to copy defaults over).
   
-  let { data: contexts, error } = await supabase
+  const { data: contexts, error } = await supabase
     .from('contexts')
     .select('id, parent_id, name, sort_order, user_id')
     .or(`user_id.eq.${user.id},user_id.is.null`)
@@ -28,7 +28,7 @@ export async function GET() {
 
   // Separate user contexts from system contexts
   const userContexts = contexts?.filter(c => c.user_id === user.id) || []
-  let systemContexts = contexts?.filter(c => c.user_id === null) || []
+  const systemContexts = contexts?.filter(c => c.user_id === null) || []
 
   // If the user has explicitly defined contexts, we only want to build the tree from their contexts.
   // If they have 0, we'll return the system contexts so the UI isn't empty.
@@ -38,7 +38,7 @@ export async function GET() {
   const contextMap = new Map()
   contextsToUse.forEach(c => contextMap.set(c.id, { ...c, children: [] }))
 
-  const rootContexts: any[] = []
+  const rootContexts: Record<string, unknown>[] = []
 
   contextsToUse.forEach(c => {
     if (c.parent_id === null) {
@@ -94,7 +94,8 @@ export async function POST() {
     }
 
     // Topologically sort system contexts so parents are inserted before children to avoid FK constraint errors
-    const systemContexts: any[] = []
+    type ContextRow = { id: string; parent_id: string | null; name: string; sort_order: number };
+    const systemContexts: ContextRow[] = []
     const remaining = [...unsortedSystemContexts]
     const insertedIds = new Set<string>()
 
@@ -114,7 +115,7 @@ export async function POST() {
     // Push any remaining orphans at the end just in case
     systemContexts.push(...remaining)
 
-    const { data: systemSuggestions, error: ssError } = await supabase
+    const { data: systemSuggestions } = await supabase
         .from('suggestions')
         .select('*')
         .in('context_id', systemContexts.map(c => c.id))

@@ -34,8 +34,8 @@ export async function POST(req: Request) {
         }
 
         return NextResponse.json(data)
-    } catch (err: any) {
-        return NextResponse.json({ error: err.message }, { status: 500 })
+    } catch (err: unknown) {
+        return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 })
     }
 }
 
@@ -55,7 +55,7 @@ export async function PUT(req: Request) {
             return NextResponse.json({ error: 'ID is required' }, { status: 400 })
         }
 
-        const updates: any = {}
+        const updates: Record<string, string | number> = {}
         if (name !== undefined) updates.name = name.trim()
         if (sort_order !== undefined) updates.sort_order = sort_order
 
@@ -73,8 +73,8 @@ export async function PUT(req: Request) {
         }
 
         return NextResponse.json(data)
-    } catch (err: any) {
-        return NextResponse.json({ error: err.message }, { status: 500 })
+    } catch (err: unknown) {
+        return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 })
     }
 }
 
@@ -131,7 +131,7 @@ export async function DELETE(req: Request) {
         }
 
         return NextResponse.json({ success: true })
-    } catch (err: any) {
-        return NextResponse.json({ error: err.message }, { status: 500 })
+    } catch (err: unknown) {
+        return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 })
     }
 }

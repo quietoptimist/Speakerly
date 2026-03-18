@@ -8,9 +8,7 @@ import { Transcript, ChatMessage } from "@/components/chat/Transcript";
 import { QuickReplies } from "@/components/chat/QuickReplies";
 import { ContextHierarchy, ContextNode, ContextSuggestion } from "@/components/chat/ContextHierarchy";
 import { ResponseGrid, ResponseItem } from "@/components/chat/ResponseGrid";
-import { AudioRecorder } from "@/components/chat/AudioRecorder";
 import { WordCloud, SuggestedWord } from "@/components/chat/WordCloud";
-import { Input } from "@/components/ui/input";
 import { experimental_useObject as useObject } from '@ai-sdk/react';
 import { z } from 'zod';
 
@@ -32,7 +30,7 @@ export default function Home() {
   const [questionResponses, setQuestionResponses] = useState<ResponseItem[]>([]);
 
   // Interlocutors State
-  const [interlocutors, setInterlocutors] = useState<any[]>([]);
+  const [interlocutors, setInterlocutors] = useState<{ id: string; name: string; relationship?: string }[]>([]);
   const [selectedInterlocutorId, setSelectedInterlocutorId] = useState<string | null>(null);
   const [isAddingPerson, setIsAddingPerson] = useState(false);
   const [newPersonName, setNewPersonName] = useState("");
@@ -119,7 +117,7 @@ export default function Home() {
   const [isSpeaking, setIsSpeaking] = useState(false);
 
   // Streaming AI hook
-  const { submit: submitPrediction, isLoading: isPredictLoading, object: predictionObject } = useObject({
+  const { submit: submitPrediction, object: predictionObject } = useObject({
     api: "/api/predict",
     schema: responseSchema,
     onError: (err: Error) => {
@@ -337,9 +335,9 @@ export default function Home() {
       if (data.questionWords) {
         setQuestionWords(prev => mergeWords(prev, data.questionWords));
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Failed to fetch fast words", error);
-      setApiError(error.message || "An unknown network error occurred.");
+      setApiError(error instanceof Error ? error.message : "An unknown network error occurred.");
     } finally {
       setIsWordsLoading(false);
     }

@@ -59,7 +59,7 @@ export default function InterlocutorsPage() {
                 const data = await res.json()
                 setInterlocutors(data)
             }
-        } catch (err) {
+        } catch (err: unknown) {
             console.error('Failed to fetch interlocutors:', err)
         } finally {
             setIsLoading(false)
@@ -78,7 +78,7 @@ export default function InterlocutorsPage() {
             } else {
                 setStatusMessage('Sync failed')
             }
-        } catch (err) {
+        } catch {
             setStatusMessage('Sync failed')
         } finally {
             setIsSyncing(false)
@@ -135,7 +135,7 @@ export default function InterlocutorsPage() {
             } else {
                 setStatusMessage('Failed to save')
             }
-        } catch (err) {
+        } catch {
             setStatusMessage('Failed to save')
         } finally {
             setIsSaving(false)
@@ -159,7 +159,7 @@ export default function InterlocutorsPage() {
              } else {
                  setStatusMessage(data.message || data.error || 'Distillation failed')
              }
-         } catch (e) {
+         } catch {
              setStatusMessage('Distillation failed')
          } finally {
              setTimeout(() => setStatusMessage(null), 4000)
@@ -269,7 +269,7 @@ export default function InterlocutorsPage() {
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     <Brain className="h-4 w-4 text-purple-400" />
-                                    <label className="text-sm text-slate-300 font-medium">What I've Learned (AI Distilled)</label>
+                                    <label className="text-sm text-slate-300 font-medium">What I&apos;ve Learned (AI Distilled)</label>
                                 </div>
                                 <Button
                                     variant="outline"
