@@ -80,7 +80,9 @@ export default function Home() {
             triggerBackgroundDistillation(null);
         }
       }
-    }).catch(console.error);
+    }).catch((err) => {
+      console.error(err);
+    });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -222,6 +224,43 @@ export default function Home() {
     setSelectedWords([]);
   }, [activeContextPath]);
 
+  // Fire-and-forget suggestions distillation when a leaf context is selected
+  useEffect(() => {
+    if (activeContextPath.length === 0) return;
+    const leaf = activeContextPath[activeContextPath.length - 1];
+    if (leaf.children && leaf.children.length > 0) return; // not a leaf
+
+    fetch('/api/distill-suggestions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        context_id: leaf.id,
+        context_path: activeContextPath.map(n => n.name),
+      }),
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data.keywords || data.sentences) {
+          const newSuggestions: ContextSuggestion[] = [
+            ...(data.keywords || []).map((text: string) => ({
+              id: crypto.randomUUID(),
+              context_id: leaf.id,
+              type: 'keyword' as const,
+              text,
+            })),
+            ...(data.sentences || []).map((text: string) => ({
+              id: crypto.randomUUID(),
+              context_id: leaf.id,
+              type: 'sentence' as const,
+              text,
+            })),
+          ];
+          setContextSuggestions(newSuggestions);
+        }
+      })
+      .catch(() => {});
+  }, [activeContextPath]);
+
   // Handle instant bypass for pre-defined context suggestions outside of manual generation constraints
   useEffect(() => {
     const isInitiativeMode = transcript.trim() === "";
@@ -350,6 +389,11 @@ export default function Home() {
         isManualMode={isManualMode} setIsManualMode={setIsManualMode}
         onTranscription={handleNewTranscription}
         selectedModel={selectedModel} setSelectedModel={setSelectedModel}
+        contextHint={[
+          activeContextPath.map(n => n.name).join(', '),
+          selectedWords.length > 0 ? `Topics: ${selectedWords.join(', ')}` : '',
+          transcript ? `Recent: ${transcript.split(' ').slice(-10).join(' ')}` : '',
+        ].filter(Boolean).join('. ') || undefined}
       />
 
       <div className="max-w-4xl mx-auto w-full">

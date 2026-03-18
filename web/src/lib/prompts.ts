@@ -70,6 +70,19 @@ ${formattedLogs}
 
 Output ONLY the updated Markdown profile. Do not include any introductory or concluding remarks.`;
 
+export const getSuggestionsDistillPrompt = (
+  recentPhrases: string[],
+  contextPath: string[]
+) => `You help an AAC (communication aid) user by learning their communication patterns.
+
+Context: ${contextPath.join(' → ')}
+
+Below are recent phrases the user actually spoke in this context:
+${recentPhrases.map((p, i) => `${i + 1}. ${p}`).join('\n')}
+
+Generate exactly 5 short, natural sentences that generalise or represent what this user typically wants to say in this context. Prefer simple, complete sentences. Do not include names. Do not invent topics not present in the examples.
+
+Return JSON: { "sentences": ["...", "...", "...", "...", "..."] }`;
 export const getInterlocutorDistillPrompt = (existingLearned: string, formattedLogs: string, interlocutorName: string, contextSummary?: string) => `You are analyzing conversation logs for an AAC (Augmentative and Alternative Communication) user's history with ${interlocutorName}.
 Given the following recent conversations and existing learned profile, extract NEW, HIGHLY SPECIFIC insights about the interaction habits with ${interlocutorName}.
 

@@ -18,12 +18,14 @@ interface TopBarProps {
     onTranscription?: (text: string) => void;
     selectedModel?: string;
     setSelectedModel?: (val: string) => void;
+    contextHint?: string;
 }
 
 export function TopBar({
     isManualMode = false, setIsManualMode,
     onTranscription,
-    selectedModel = "openai", setSelectedModel
+    selectedModel = "openai", setSelectedModel,
+    contextHint,
 }: TopBarProps) {
 
     return (
@@ -94,7 +96,7 @@ export function TopBar({
             <div className="flex items-center gap-3 relative z-50">
                 {/* Audio Recorder in Header */}
                 {onTranscription && (
-                    <AudioRecorder onTranscription={onTranscription} />
+                    <AudioRecorder onTranscription={onTranscription} contextHint={contextHint} />
                 )}
                 
                 {/* Profile Button */}

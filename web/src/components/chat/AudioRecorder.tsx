@@ -4,14 +4,16 @@ import { Mic, Square, Loader2 } from 'lucide-react';
 
 interface AudioRecorderProps {
     onTranscription: (text: string) => void;
+    contextHint?: string;
 }
 
-export function AudioRecorder({ onTranscription }: AudioRecorderProps) {
+export function AudioRecorder({ onTranscription, contextHint }: AudioRecorderProps) {
     const [isRecording, setIsRecording] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
 
     const audioContextRef = useRef<AudioContext | null>(null);
     const processorRef = useRef<ScriptProcessorNode | null>(null);
+    const mutedGainRef = useRef<GainNode | null>(null);
     const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
     const streamRef = useRef<MediaStream | null>(null);
     const samplesRef = useRef<Float32Array[]>([]);
@@ -24,7 +26,13 @@ export function AudioRecorder({ onTranscription }: AudioRecorderProps) {
                 return;
             }
 
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const stream = await navigator.mediaDevices.getUserMedia({
+                audio: {
+                    echoCancellation: false,
+                    noiseSuppression: false,
+                    autoGainControl: false,
+                },
+            });
             streamRef.current = stream;
 
             // Use ScriptProcessorNode to capture raw PCM samples directly.
@@ -49,8 +57,13 @@ export function AudioRecorder({ onTranscription }: AudioRecorderProps) {
             };
 
             source.connect(processor);
-            // Connect to destination to keep the audio graph running (required in some browsers)
-            processor.connect(audioContext.destination);
+            // Route through a muted GainNode to keep the audio graph alive without
+            // feeding the mic back through speakers (which triggers echo cancellation).
+            const mutedGain = audioContext.createGain();
+            mutedGain.gain.value = 0;
+            mutedGainRef.current = mutedGain;
+            processor.connect(mutedGain);
+            mutedGain.connect(audioContext.destination);
 
             setIsRecording(true);
         } catch (err) {
@@ -64,13 +77,16 @@ export function AudioRecorder({ onTranscription }: AudioRecorderProps) {
 
         sourceRef.current?.disconnect();
         processorRef.current?.disconnect();
+        mutedGainRef.current?.disconnect();
         audioContextRef.current?.close();
         streamRef.current?.getTracks().forEach(t => t.stop());
 
         setIsRecording(false);
 
         const samples = samplesRef.current;
-        if (samples.length > 0) {
+        const totalSamples = samples.reduce((n, c) => n + c.length, 0);
+        const durationSecs = totalSamples / sampleRateRef.current;
+        if (durationSecs >= 0.5) {
             processAudio(encodeWav(samples, sampleRateRef.current));
         }
     };
@@ -116,6 +132,7 @@ export function AudioRecorder({ onTranscription }: AudioRecorderProps) {
         try {
             const formData = new FormData();
             formData.append('file', wavBlob, 'recording.wav');
+            if (contextHint) formData.append('prompt', contextHint);
 
             const response = await fetch('/api/transcribe', {
                 method: 'POST',

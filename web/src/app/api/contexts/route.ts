@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
+import { copyDefaultsForUser } from '@/lib/contextUtils'
 
 export async function GET() {
   const supabase = await createClient()
@@ -67,9 +68,9 @@ export async function GET() {
   }
 
   return NextResponse.json({
-      tree: rootContexts,
-      suggestions: suggestions,
-      isUsingDefaults: userContexts.length === 0
+    tree: rootContexts,
+    suggestions: suggestions,
+    isUsingDefaults: userContexts.length === 0
   })
 }
 
@@ -82,111 +83,11 @@ export async function POST() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // 1. Fetch system defaults
-    const { data: unsortedSystemContexts, error: scError } = await supabase
-      .from('contexts')
-      .select('*')
-      .is('user_id', null)
-      .order('sort_order', { ascending: true })
-
-    if (scError || !unsortedSystemContexts || unsortedSystemContexts.length === 0) {
-        return NextResponse.json({ error: 'Failed to find system defaults' }, { status: 500 })
+    try {
+        await copyDefaultsForUser(supabase, user.id)
+        return NextResponse.json({ success: true, message: "Successfully copied defaults" })
+    } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err)
+        return NextResponse.json({ error: message }, { status: 500 })
     }
-
-    // Topologically sort system contexts so parents are inserted before children to avoid FK constraint errors
-    type ContextRow = { id: string; parent_id: string | null; name: string; sort_order: number };
-    const systemContexts: ContextRow[] = []
-    const remaining = [...unsortedSystemContexts]
-    const insertedIds = new Set<string>()
-
-    while (remaining.length > 0) {
-        let addedThisRound = false
-        for (let i = remaining.length - 1; i >= 0; i--) {
-            const c = remaining[i]
-            if (c.parent_id === null || insertedIds.has(c.parent_id)) {
-                systemContexts.push(c)
-                insertedIds.add(c.id)
-                remaining.splice(i, 1)
-                addedThisRound = true
-            }
-        }
-        if (!addedThisRound) break; // Cyclic reference or orphaned nodes, break to avoid infinite loop
-    }
-    // Push any remaining orphans at the end just in case
-    systemContexts.push(...remaining)
-
-    const { data: systemSuggestions } = await supabase
-        .from('suggestions')
-        .select('*')
-        .in('context_id', systemContexts.map(c => c.id))
-    
-    // We don't fail if there are no suggestions, just continue.
-
-    // 2. Clear existing user contexts (DANGEROUS but this is a full "Reset to Default" action)
-    const { error: deleteError } = await supabase
-        .from('contexts')
-        .delete()
-        .eq('user_id', user.id)
-
-    if (deleteError) {
-        return NextResponse.json({ error: 'Failed to clear existing user contexts' }, { status: 500 })
-    }
-
-    // 3. Map old ID to new UUID
-    const idMap = new Map<string, string>()
-
-    // Supabase JS doesn't have a reliable way to insert nested hierarchies while preserving
-    // generated UUIDs securely in a single batch insert, so we'll generate UUIDs locally and insert.
-    // Node.js crypto isn't available in Edge runtime, so we use web crypto if needed, 
-    // but the Supabase client can generate UUIDs if we let the DB do it. 
-    // The easiest way is to insert parents first, then children, etc.
-
-    // Helper to generate a simple UUID for mapping purposes before inserting to DB
-    const generateUUID = () => crypto.randomUUID()
-    
-    // First pass: Assign new IDs
-    for (const c of systemContexts) {
-        idMap.set(c.id, generateUUID())
-    }
-
-    // Prepare inserts
-    const contextInserts = systemContexts.map(c => ({
-        id: idMap.get(c.id),
-        user_id: user.id,
-        parent_id: c.parent_id ? idMap.get(c.parent_id) : null,
-        name: c.name,
-        sort_order: c.sort_order
-    }))
-
-    const suggestionInserts = (systemSuggestions || []).map(s => {
-        const mappedId = idMap.get(s.context_id);
-        if (!mappedId) return null; // Safety check
-        return {
-            context_id: mappedId,
-            type: s.type,
-            text: s.text
-        };
-    }).filter(Boolean); // Clear nulls
-
-    // Execute inserts
-    const { error: insertContextError } = await supabase
-        .from('contexts')
-        .insert(contextInserts)
-
-    if (insertContextError) {
-        return NextResponse.json({ error: 'Failed to copy system contexts' }, { status: 500 })
-    }
-
-    if (suggestionInserts.length > 0) {
-        const { error: insertSuggestionError } = await supabase
-            .from('suggestions')
-            .insert(suggestionInserts)
-
-        if (insertSuggestionError) {
-            // Non-fatal, return warnings
-            console.error(insertSuggestionError)
-        }
-    }
-
-    return NextResponse.json({ success: true, message: "Successfully copied defaults" })
-}
+1}
