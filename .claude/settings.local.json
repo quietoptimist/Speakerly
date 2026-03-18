@@ -1,7 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(find /Users/johnfoster/Coding/Speakerly -name *.sql -type f)",
+      "Bash(grep -r contexts /Users/johnfoster/Coding/Speakerly/web/*.sql)",
+      "Bash(grep -r suggestions /Users/johnfoster/Coding/Speakerly/web/*.sql)",
+      "Bash(npx tsc:*)"
     ]
   }
 }

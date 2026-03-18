@@ -3,7 +3,6 @@ import { generateObject } from 'ai'
 import { openai } from '@ai-sdk/openai'
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
-import { copyDefaultsForUser } from '@/lib/contextUtils'
 import { getSuggestionsDistillPrompt } from '@/lib/prompts'
 import { STOP_WORDS } from '@/lib/stopWords'
 
@@ -18,15 +17,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  let { context_id, context_path } = await req.json() as {
+  const { context_id, context_path } = await req.json() as {
     context_id: string
     context_path: string[]
   }
 
-  // Fetch context row
-  let { data: ctx } = await supabase
+  // Verify context exists (system or user-owned)
+  const { data: ctx } = await supabase
     .from('contexts')
-    .select('id, user_id, last_distilled_at')
+    .select('id, user_id')
     .eq('id', context_id)
     .single()
 
@@ -34,48 +33,21 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Context not found' }, { status: 404 })
   }
 
-  // If this is a system default context (user_id IS NULL), clone it first
-  if (ctx.user_id === null) {
-    try {
-      const idMap = await copyDefaultsForUser(supabase, user.id)
-      // Find the equivalent user-owned leaf by matching name in the path
-      // The last segment of context_path is the leaf node name
-      const leafName = context_path[context_path.length - 1]
-      const { data: newLeaf } = await supabase
-        .from('contexts')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('name', leafName)
-        .single()
-
-      if (newLeaf) {
-        context_id = newLeaf.id
-      } else {
-        // Fall back: look up via idMap
-        const mappedId = idMap.get(context_id)
-        if (mappedId) context_id = mappedId
-      }
-
-      // Re-fetch the context row with the new id
-      const { data: newCtx } = await supabase
-        .from('contexts')
-        .select('id, user_id, last_distilled_at')
-        .eq('id', context_id)
-        .single()
-      ctx = newCtx
-    } catch (err: any) {
-      return NextResponse.json({ error: err.message }, { status: 500 })
-    }
-  }
-
-  // Verify it now belongs to the user
-  if (!ctx || ctx.user_id !== user.id) {
+  // Check access: must be system context or owned by user
+  if (ctx.user_id !== null && ctx.user_id !== user.id) {
     return NextResponse.json({ error: 'Context not accessible' }, { status: 403 })
   }
 
-  // Cooldown gate
-  if (ctx.last_distilled_at) {
-    const lastRun = new Date(ctx.last_distilled_at).getTime()
+  // Cooldown gate: check user_context_meta
+  const { data: meta } = await supabase
+    .from('user_context_meta')
+    .select('last_distilled_at')
+    .eq('user_id', user.id)
+    .eq('context_id', context_id)
+    .single()
+
+  if (meta?.last_distilled_at) {
+    const lastRun = new Date(meta.last_distilled_at).getTime()
     const cutoff = Date.now() - COOLDOWN_HOURS * 60 * 60 * 1000
     if (lastRun > cutoff) {
       return NextResponse.json({ skipped: 'cooldown' })
@@ -89,8 +61,8 @@ export async function POST(req: Request) {
     .eq('user_id', user.id)
     .contains('context_path', context_path)
 
-  if (ctx.last_distilled_at) {
-    countQuery = countQuery.gt('created_at', ctx.last_distilled_at)
+  if (meta?.last_distilled_at) {
+    countQuery = countQuery.gt('created_at', meta.last_distilled_at)
   }
 
   const { count } = await countQuery
@@ -173,22 +145,29 @@ export async function POST(req: Request) {
     }
   }
 
-  // Write to DB: delete old suggestions, insert new ones, update last_distilled_at
-  await supabase.from('suggestions').delete().eq('context_id', context_id)
+  // Write to DB: delete old user-owned suggestions for this context, insert new ones
+  await supabase
+    .from('suggestions')
+    .delete()
+    .eq('context_id', context_id)
+    .eq('user_id', user.id)
 
   const inserts = [
-    ...topKeywords.map(text => ({ context_id, type: 'keyword' as const, text })),
-    ...sentences.map(text => ({ context_id, type: 'sentence' as const, text })),
+    ...topKeywords.map(text => ({ context_id, type: 'keyword' as const, text, user_id: user.id })),
+    ...sentences.map(text => ({ context_id, type: 'sentence' as const, text, user_id: user.id })),
   ]
 
   if (inserts.length > 0) {
     await supabase.from('suggestions').insert(inserts)
   }
 
+  // Update user_context_meta (upsert)
   await supabase
-    .from('contexts')
-    .update({ last_distilled_at: new Date().toISOString() })
-    .eq('id', context_id)
+    .from('user_context_meta')
+    .upsert(
+      { user_id: user.id, context_id, last_distilled_at: new Date().toISOString() },
+      { onConflict: 'user_id,context_id' }
+    )
 
   return NextResponse.json({ keywords: topKeywords, sentences })
 }

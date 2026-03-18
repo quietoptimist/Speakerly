@@ -1,47 +1,45 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
-import { copyDefaultsForUser } from '@/lib/contextUtils'
 
 export async function GET() {
   const supabase = await createClient()
 
-  // Verify Auth
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // 1. Fetch user-specific contexts, OR default contexts if the user has none
-  // Since we want users to be able to "reset" branches to defaults, and potentially
-  // have a mix of custom and default nodes, a simple approach is:
-  // If the user has *no* custom contexts at all, return the defaults.
-  // Otherwise, return *only* the user's custom contexts. (The client can explicitly call an API to copy defaults over).
-  
+  // Fetch all system contexts + user's own contexts
   const { data: contexts, error } = await supabase
     .from('contexts')
     .select('id, parent_id, name, sort_order, user_id')
-    .or(`user_id.eq.${user.id},user_id.is.null`)
+    .or(`user_id.is.null,user_id.eq.${user.id}`)
     .order('sort_order', { ascending: true })
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  // Separate user contexts from system contexts
-  const userContexts = contexts?.filter(c => c.user_id === user.id) || []
-  const systemContexts = contexts?.filter(c => c.user_id === null) || []
+  // Fetch user's context dismissals
+  const { data: dismissals } = await supabase
+    .from('user_context_dismissals')
+    .select('context_id')
+    .eq('user_id', user.id)
 
-  // If the user has explicitly defined contexts, we only want to build the tree from their contexts.
-  // If they have 0, we'll return the system contexts so the UI isn't empty.
-  const contextsToUse = userContexts.length > 0 ? userContexts : systemContexts
+  const dismissedContextIds = new Set((dismissals || []).map(d => d.context_id))
+
+  // Filter out dismissed system contexts (user-owned contexts are never dismissed)
+  const filteredContexts = (contexts || []).filter(c => {
+    if (c.user_id === null && dismissedContextIds.has(c.id)) return false
+    return true
+  })
 
   // Build the nested tree
   const contextMap = new Map()
-  contextsToUse.forEach(c => contextMap.set(c.id, { ...c, children: [] }))
+  filteredContexts.forEach(c => contextMap.set(c.id, { ...c, children: [] }))
 
   const rootContexts: Record<string, unknown>[] = []
-
-  contextsToUse.forEach(c => {
+  filteredContexts.forEach(c => {
     if (c.parent_id === null) {
       rootContexts.push(contextMap.get(c.id))
     } else {
@@ -52,42 +50,28 @@ export async function GET() {
     }
   })
 
-  // Fetch suggestions for contexts being returned
-  const contextIds = contextsToUse.map(c => c.id)
-  
-  let suggestions = []
+  // Fetch suggestions (system + user's own) for these contexts, filtered by dismissals
+  const contextIds = filteredContexts.map(c => c.id)
+
+  let suggestions: unknown[] = []
   if (contextIds.length > 0) {
-      const { data: suggData, error: suggError } = await supabase
-        .from('suggestions')
-        .select('*')
-        .in('context_id', contextIds)
-        
-      if (!suggError && suggData) {
-          suggestions = suggData
-      }
+    const { data: suggDismissals } = await supabase
+      .from('user_suggestion_dismissals')
+      .select('suggestion_id')
+      .eq('user_id', user.id)
+
+    const dismissedSuggIds = new Set((suggDismissals || []).map(d => d.suggestion_id))
+
+    const { data: suggData, error: suggError } = await supabase
+      .from('suggestions')
+      .select('*')
+      .in('context_id', contextIds)
+      .or(`user_id.is.null,user_id.eq.${user.id}`)
+
+    if (!suggError && suggData) {
+      suggestions = suggData.filter(s => !dismissedSuggIds.has(s.id))
+    }
   }
 
-  return NextResponse.json({
-    tree: rootContexts,
-    suggestions: suggestions,
-    isUsingDefaults: userContexts.length === 0
-  })
+  return NextResponse.json({ tree: rootContexts, suggestions })
 }
-
-// POST endpoint to handle explicitly copying defaults to the user's profile
-export async function POST() {
-    const supabase = await createClient()
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    try {
-        await copyDefaultsForUser(supabase, user.id)
-        return NextResponse.json({ success: true, message: "Successfully copied defaults" })
-    } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : String(err)
-        return NextResponse.json({ error: message }, { status: 500 })
-    }
-1}

@@ -36,6 +36,14 @@ export default function Home() {
   const [newPersonName, setNewPersonName] = useState("");
   const [isCreatingPerson, setIsCreatingPerson] = useState(false);
 
+  const [isAdminUser, setIsAdminUser] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/me').then(r => r.json()).then(data => {
+      if (data.isAdmin) setIsAdminUser(true)
+    }).catch(() => {})
+  }, [])
+
   const triggerBackgroundDistillation = useCallback((interlocutorId?: string | null) => {
     fetch('/api/distill', {
       method: 'POST',
@@ -496,6 +504,7 @@ export default function Home() {
               activeContextPath={activeContextPath}
               setActiveContextPath={setActiveContextPath}
               onSuggestionsChange={setContextSuggestions}
+              isAdmin={isAdminUser}
             />
           </div>
 
